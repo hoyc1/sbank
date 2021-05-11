@@ -651,21 +651,21 @@ def aligned_spin_hom_param_generator(flow, tmplt_class, bank, **constraints):
     Wrapper for urand_tau0tau3_generator() to remove spin options
     for EOBNRv2 waveforms.
     """
-    dur_min, dur_max = kwargs.pop('duration', (None, None))
+    dur_min, dur_max = constraints.pop('duration', (None, None))
 
     # define a helper function to apply the appropriate spin bounds
-    if 'ns_bh_boundary_mass' in kwargs and 'bh_spin' in kwargs \
-            and 'ns_spin' in kwargs:
-        bh_spin_bounds = kwargs.pop('bh_spin')
-        ns_spin_bounds = kwargs.pop('ns_spin')
-        ns_bh_boundary = kwargs.pop('ns_bh_boundary_mass')
+    if 'ns_bh_boundary_mass' in constraints and 'bh_spin' in constraints \
+            and 'ns_spin' in constraints:
+        bh_spin_bounds = constraints.pop('bh_spin')
+        ns_spin_bounds = constraints.pop('ns_spin')
+        ns_bh_boundary = constraints.pop('ns_bh_boundary_mass')
 
         def spin_bounds(mass1, mass2):
             return (bh_spin_bounds if mass1 > ns_bh_boundary else ns_spin_bounds), \
                    (bh_spin_bounds if mass2 > ns_bh_boundary else ns_spin_bounds)
     else:
-        spin1b = kwargs.pop('spin1', (-1., 1.))
-        spin2b = kwargs.pop('spin2', (-1., 1.))
+        spin1b = constraints.pop('spin1', (-1., 1.))
+        spin2b = constraints.pop('spin2', (-1., 1.))
 
         def spin_bounds(mass1, mass2):
             return spin1b, spin2b
