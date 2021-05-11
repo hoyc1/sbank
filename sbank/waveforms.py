@@ -1056,5 +1056,5 @@ waveforms = {
     "EOBNRv2HM_ROM": EOBNRHigherOrderModeTemplate,
     "EOBNRv2HM_ROM_AmpMax": EOBNRHigherOrderModeAmpMaxTemplate,
     "EOBNRv2HM_ROM_PhaseMax": EOBNRHigherOrderModePhaseMaxTemplate,
-    "IMRPhenomXHM", IMRPhenomXHMTemplate,
+    "IMRPhenomXHM": IMRPhenomXHMTemplate,
 }
