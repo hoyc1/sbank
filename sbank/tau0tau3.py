@@ -646,6 +646,56 @@ def nonspin_hom_param_generator(flow, tmplt_class, bank, **constraints):
         yield tmplt_class(mass1, mass2, 0, 0, 0, 0, 0, 0,
                           theta, phi, iota, psi, orb_phase, bank)
 
+def aligned_spin_hom_param_generator(flow, tmplt_class, bank, **constraints):
+    """
+    Wrapper for urand_tau0tau3_generator() to remove spin options
+    for EOBNRv2 waveforms.
+    """
+    dur_min, dur_max = kwargs.pop('duration', (None, None))
+
+    # define a helper function to apply the appropriate spin bounds
+    if 'ns_bh_boundary_mass' in kwargs and 'bh_spin' in kwargs \
+            and 'ns_spin' in kwargs:
+        bh_spin_bounds = kwargs.pop('bh_spin')
+        ns_spin_bounds = kwargs.pop('ns_spin')
+        ns_bh_boundary = kwargs.pop('ns_bh_boundary_mass')
+
+        def spin_bounds(mass1, mass2):
+            return (bh_spin_bounds if mass1 > ns_bh_boundary else ns_spin_bounds), \
+                   (bh_spin_bounds if mass2 > ns_bh_boundary else ns_spin_bounds)
+    else:
+        spin1b = kwargs.pop('spin1', (-1., 1.))
+        spin2b = kwargs.pop('spin2', (-1., 1.))
+
+        def spin_bounds(mass1, mass2):
+            return spin1b, spin2b
+
+    for mass1, mass2 in urand_tau0tau3_generator(flow, **constraints):
+        theta = uniform(0, numpy.pi)
+        phi = uniform(0, 2*numpy.pi)
+        psi = uniform(0, 2*numpy.pi)
+        iota = uniform(0, numpy.pi)
+        orb_phase = uniform(0, 2*numpy.pi)
+        spin1_bounds, spin2_bounds = spin_bounds(mass1, mass2)
+
+        mtot = mass1 + mass2
+        chis_min = (mass1*spin1_bounds[0] + mass2*spin2_bounds[0])/mtot
+        chis_max = (mass1*spin1_bounds[1] + mass2*spin2_bounds[1])/mtot
+        chis = uniform(chis_min, chis_max)
+
+        s2min = max(spin2_bounds[0], (mtot*chis - mass1*spin1_bounds[1])/mass2)
+        s2max = min(spin2_bounds[1], (mtot*chis - mass1*spin1_bounds[0])/mass2)
+
+        spin2 = uniform(s2min, s2max)
+        spin1 = (chis*mtot - mass2*spin2)/mass1
+
+        t = tmplt_class(mass1, mass2, 0, 0, spin1, 0, 0, spin2,
+                        theta, phi, iota, psi, orb_phase, bank)
+        if (dur_min is not None and t.dur < dur_min) \
+                or (dur_max is not None and t.dur > dur_max):
+            continue
+        yield t
+
 
 proposals = {
     "IMRPhenomB": IMRPhenomB_param_generator,
@@ -654,6 +704,7 @@ proposals = {
     "TaylorF2": aligned_spin_param_generator,
     "IMRPhenomP": double_spin_precessing_param_generator,
     "IMRPhenomPv2": double_spin_precessing_param_generator,
+    "IMRPhenomPv3": double_spin_precessing_param_generator,
     "TaylorF2RedSpin": aligned_spin_param_generator,
     "EOBNRv2": nonspin_param_generator,
     "SEOBNRv1": aligned_spin_param_generator,
@@ -669,4 +720,5 @@ proposals = {
     "EOBNRv2HM_ROM": nonspin_hom_param_generator,
     "EOBNRv2HM_ROM_AmpMax": nonspin_hom_param_generator,
     "EOBNRv2HM_ROM_PhaseMax": nonspin_hom_param_generator,
+    "IMRPhenomXHM": aligned_spin_hom_param_generator,
 }

@@ -977,6 +977,8 @@ class IMRPhenomPTemplate(IMRPrecessingSpinTemplate):
 class IMRPhenomPv2Template(IMRPrecessingSpinTemplate):
     approximant = "IMRPhenomPv2"
 
+class IMRPhenomPv2Template(IMRPrecessingSpinTemplate):
+    approximant = "IMRPhenomPv3"
 
 class HigherOrderModeTemplate(PrecessingSpinTemplate):
     """Class for higher order mode templates.
@@ -1006,6 +1008,12 @@ class EOBNRHigherOrderModeTemplate(IMRPrecessingSpinTemplate,
     approximant = "EOBNRv2HM_ROM"
 
 
+class IMRPhenomXHMTemplate(IMRPrecessingSpinTemplate,
+                                   HigherOrderModeTemplate):
+    """Class for EOBNRHM templates."""
+    approximant = "IMRPhenomXHM"
+
+
 class EOBNRHigherOrderModeAmpMaxTemplate(IMRPrecessingSpinTemplate):
     """Class for EOBNRHM templates."""
     approximant = "EOBNRv2HM_ROM"
@@ -1033,6 +1041,7 @@ waveforms = {
     "IMRPhenomD": IMRPhenomDTemplate,
     "IMRPhenomP": IMRPhenomPTemplate,
     "IMRPhenomPv2": IMRPhenomPv2Template,
+    "IMRPhenomPv3": IMRPhenomPv3Template,
     "SEOBNRv2": SEOBNRv2Template,
     "SEOBNRv2_ROM_DoubleSpin": SEOBNRv2ROMDoubleSpinTemplate,
     "SEOBNRv2_ROM_DoubleSpin_HI": SEOBNRv2ROMDoubleSpinHITemplate,
@@ -1046,5 +1055,6 @@ waveforms = {
     "SEOBNRv3": SEOBNRv3Template,
     "EOBNRv2HM_ROM": EOBNRHigherOrderModeTemplate,
     "EOBNRv2HM_ROM_AmpMax": EOBNRHigherOrderModeAmpMaxTemplate,
-    "EOBNRv2HM_ROM_PhaseMax": EOBNRHigherOrderModePhaseMaxTemplate
+    "EOBNRv2HM_ROM_PhaseMax": EOBNRHigherOrderModePhaseMaxTemplate,
+    "IMRPhenomXHM", IMRPhenomXHMTemplate,
 }
