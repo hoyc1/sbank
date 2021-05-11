@@ -977,8 +977,10 @@ class IMRPhenomPTemplate(IMRPrecessingSpinTemplate):
 class IMRPhenomPv2Template(IMRPrecessingSpinTemplate):
     approximant = "IMRPhenomPv2"
 
-class IMRPhenomPv2Template(IMRPrecessingSpinTemplate):
+
+class IMRPhenomPv3Template(IMRPrecessingSpinTemplate):
     approximant = "IMRPhenomPv3"
+
 
 class HigherOrderModeTemplate(PrecessingSpinTemplate):
     """Class for higher order mode templates.
