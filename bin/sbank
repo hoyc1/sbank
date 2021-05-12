@@ -345,7 +345,7 @@ if opts.reference_psd is not None:
         if opts.instrument:
             psd = psddict[opts.instrument]
         elif len(psddict.keys()) == 1:
-            psd = psddict[psddict.keys()[0]]
+            psd = psddict[list(psddict.keys())[0]]
         else:
             raise ValueError("More than one PSD found in file %s. Specify which you want with --instrument." % opts.reference_psd)
         f_orig = psd.f0 + np.arange(len(psd.data.data)) * psd.deltaF
