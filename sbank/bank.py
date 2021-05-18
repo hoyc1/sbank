@@ -218,14 +218,8 @@ class Bank(object):
                               self.noise_model)
                 match = self.compute_match(tmplt, proposal,
                                            self.coarse_match_df, PSD=PSD)
-                if match == 0:
-                    err_msg = "Match is 0. This might indicate that you have "
-                    err_msg += "the df value too high. Please try setting the "
-                    err_msg += "coarse-value-df value lower."
-                    # FIXME: This could be dealt with dynamically??
-                    raise ValueError(err_msg)
 
-                if (1 - match) > 0.05 + (1 - min_match):
+                if (match > 0) and ((1 - match) > (0.05 + 1 - min_match)):
                     continue
 
             while df >= df_end:
@@ -233,11 +227,9 @@ class Bank(object):
                 PSD = get_PSD(df, self.flow, f_max, self.noise_model)
                 match = self.compute_match(tmplt, proposal, df, PSD=PSD)
                 if match == 0:
-                    err_msg = "Match is 0. This might indicate that you have "
-                    err_msg += "the df value too high. Please try setting the "
-                    err_msg += "iterative-match-df-max value lower."
-                    # FIXME: This could be dealt with dynamically??
-                    raise ValueError(err_msg)
+                    match_last = -1
+                    df /= 2.0
+                    continue
 
                 # if the result is a really bad match, trust it isn't
                 # misrepresenting a good match
