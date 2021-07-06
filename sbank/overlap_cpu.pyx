@@ -11,6 +11,7 @@ cdef extern from "overlap_cpu_lib.c":
     double _SBankComputeRealMatch(float complex *inj, float complex *tmplt, size_t min_len, double delta_f, WS *workspace_cache)
     double _SBankComputeMatchMaxSkyLoc(float complex *hp, float complex *hc, const double hphccorr, float complex *proposal, size_t min_len, double delta_f, WS *workspace_cache1, WS *workspace_cache2)
     double _SBankComputeMatchMaxSkyLocNoPhase(float complex *hp, float complex *hc, const double hphccorr, float complex *proposal, size_t min_len, double delta_f, WS *workspace_cache1, WS *workspace_cache2)
+    double _SBankComputeFiveCompMatch(float complex *temp_comp1, float complex *temp_comp2, float complex *temp_comp3, float complex *temp_comp4, float complex *temp_comp5, float complex *proposal, size_t min_len, double delta_f, WS *workspace_cache1, WS *workspace_cache2, WS *workspace_cache3, WS *workspace_cache4, WS *workspace_cache5)
 
 
 # WARNING: Handling C pointers in python gets nasty. The workspace item is
@@ -110,3 +111,32 @@ def SBankCythonComputeMatchMaxSkyLocNoPhase(
     return _SBankComputeMatchMaxSkyLocNoPhase(&hp[0], &hc[0], hphccorr,
                                               &proposal[0], min_len, delta_f,
                                               _workspace1, _workspace2)
+
+def SBankCythonComputeFiveCompMatch(
+    numpy.ndarray[numpy.complex64_t, ndim=1, mode="c"] temp_comp1,
+    numpy.ndarray[numpy.complex64_t, ndim=1, mode="c"] temp_comp2,
+    numpy.ndarray[numpy.complex64_t, ndim=1, mode="c"] temp_comp3,
+    numpy.ndarray[numpy.complex64_t, ndim=1, mode="c"] temp_comp4,
+    numpy.ndarray[numpy.complex64_t, ndim=1, mode="c"] temp_comp5,
+    numpy.ndarray[numpy.complex64_t, ndim=1, mode="c"] proposal,
+    int min_len,
+    double delta_f,
+    workspace_cache1,
+    workspace_cache2,
+    workspace_cache3,
+    workspace_cache4,
+    workspace_cache5
+):
+    cdef WS* _workspace1
+    cdef WS* _workspace2
+    cdef WS* _workspace3
+    cdef WS* _workspace4
+    cdef WS* _workspace5
+    _workspace1 = SBankWorkspaceCache.get_workspace(workspace_cache1)
+    _workspace2 = SBankWorkspaceCache.get_workspace(workspace_cache2)
+    _workspace3 = SBankWorkspaceCache.get_workspace(workspace_cache3)
+    _workspace4 = SBankWorkspaceCache.get_workspace(workspace_cache4)
+    _workspace5 = SBankWorkspaceCache.get_workspace(workspace_cache5)
+
+    return _SBankComputeFiveCompMatch(&temp_comp1[0], &temp_comp2[0], &temp_comp3[0], &temp_comp4[0], &temp_comp5[0], &proposal[0], min_len, delta_f, _workspace1, _workspace2, _workspace3, _workspace4, _workspace5)
+

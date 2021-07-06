@@ -58,6 +58,14 @@ double _SBankComputeMatchMaxSkyLoc(complex *hp, complex *hc, const double hphcco
 
 double _SBankComputeMatchMaxSkyLocNoPhase(complex *hp, complex *hc, const double hphccorr, complex *proposal, size_t min_len, double delta_f, WS *workspace_cache1, WS *workspace_cache2);
 
+double _SBankComputeFiveCompMatch(complex *temp_comp1, complex *temp_comp2,
+                                  complex *temp_comp3, complex *temp_comp4,
+                                  complex *temp_comp5, complex *proposal,
+                                  size_t min_len, double delta_f, 
+                                  WS *workspace_cache1,
+                                  WS *workspace_cache2, WS *workspace_cache3,
+                                  WS *workspace_cache4, WS *workspace_cache5);
+
 #define MAX_NUM_WS 32  /* maximum number of workspaces */
 #define CHECK_OOM(ptr, msg) if (!(ptr)) { XLALPrintError((msg)); exit(-1); }
 
@@ -372,4 +380,95 @@ double _SBankComputeMatchMaxSkyLocNoPhase(complex *hp, complex *hc, const double
 
     /* Return match */
     return 4. * delta_f * sqrt(max);
+}
+
+double _SBankComputeFiveCompMatch(complex *temp_comp1, complex *temp_comp2,
+                                  complex *temp_comp3, complex *temp_comp4,
+                                  complex *temp_comp5, complex *proposal,
+                                  size_t min_len, double delta_f,
+                                  WS *workspace_cache1,
+                                  WS *workspace_cache2, WS *workspace_cache3,
+                                  WS *workspace_cache4, WS *workspace_cache5)
+{
+    /* get workspace for + and - frequencies */
+    size_t n = 2 * (min_len - 1);   /* no need to integrate implicit zeros */
+    WS *ws1 = get_workspace(workspace_cache1, n);
+    if (!ws1) {
+        XLALPrintError("out of space in the workspace_cache\n");
+        exit(-1);
+    }
+    WS *ws2 = get_workspace(workspace_cache2, n);
+    if (!ws2) {
+        XLALPrintError("out of space in the workspace_cache\n");
+        exit(-1);
+    }
+    WS *ws3 = get_workspace(workspace_cache3, n);
+    if (!ws3) {
+        XLALPrintError("out of space in the workspace_cache\n");
+        exit(-1);
+    }
+    WS *ws4 = get_workspace(workspace_cache4, n);
+    if (!ws4) {
+        XLALPrintError("out of space in the workspace_cache\n");
+        exit(-1);
+    }
+    WS *ws5 = get_workspace(workspace_cache5, n);
+    if (!ws5) {
+        XLALPrintError("out of space in the workspace_cache\n");
+        exit(-1);
+    }
+
+    /* compute complex SNR time-series in freq-domain, then time-domain */
+    /* Note that findchirp paper eq 4.2 defines a positive-frequency integral,
+     * so we should only fill the positive frequencies (first half of zf). */
+    multiply_conjugate(ws1->zf->data, temp_comp1, proposal, min_len);
+    XLALCOMPLEX8VectorFFT(ws1->zt, ws1->zf, ws1->plan); /* plan is reverse */
+    multiply_conjugate(ws2->zf->data, temp_comp2, proposal, min_len);
+    XLALCOMPLEX8VectorFFT(ws2->zt, ws2->zf, ws2->plan);
+    multiply_conjugate(ws3->zf->data, temp_comp3, proposal, min_len);
+    XLALCOMPLEX8VectorFFT(ws3->zt, ws3->zf, ws3->plan);
+    multiply_conjugate(ws4->zf->data, temp_comp4, proposal, min_len);
+    XLALCOMPLEX8VectorFFT(ws4->zt, ws4->zf, ws4->plan);
+    multiply_conjugate(ws5->zf->data, temp_comp5, proposal, min_len);
+    XLALCOMPLEX8VectorFFT(ws5->zt, ws5->zf, ws5->plan);
+
+    /* maximize over |z(t)|^2 */
+    float complex *zdata1 = ws1->zt->data;
+    float complex *zdata2 = ws2->zt->data;
+    float complex *zdata3 = ws3->zt->data;
+    float complex *zdata4 = ws4->zt->data;
+    float complex *zdata5 = ws5->zt->data;
+
+    size_t k = n;
+    ssize_t argmax = -1;
+    double max = 0.;
+    for (;k--;) {
+        double temp = abs2(zdata1[k]) + abs2(zdata2[k]) + abs2(zdata3[k])
+                    + abs2(zdata4[k]) + abs2(zdata5[k]);
+        if (temp > max) {
+            argmax = k;
+            max = temp;
+        }
+    }
+    if (max == 0.) return 0.;
+
+    /* refine estimate of maximum */
+    double result;
+    double templ, tempu;
+    /*if (argmax == 0 || argmax == (ssize_t) n - 1)
+        result = max;
+    else
+        templ = abs2(zdata1[argmax - 1]) + abs2(zdata2[argmax - 1])
+              + abs2(zdata3[argmax - 1]) + abs2(zdata4[argmax - 1])
+              + abs2(zdata5[argmax - 1]);
+        tempu = abs2(zdata1[argmax + 1]) + abs2(zdata2[argmax + 1])
+              + abs2(zdata3[argmax + 1]) + abs2(zdata4[argmax + 1]) 
+              + abs2(zdata5[argmax + 1]);
+        result = vector_peak_interp(templ, max, tempu);
+        result = max;*/
+
+    /* compute match */
+    result = max;
+
+    return 4. * delta_f * sqrt(result);
 }

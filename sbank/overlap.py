@@ -9,6 +9,7 @@ from .overlap_cpu import SBankCythonComputeMatch
 from .overlap_cpu import SBankCythonComputeRealMatch
 from .overlap_cpu import SBankCythonComputeMatchMaxSkyLoc
 from .overlap_cpu import SBankCythonComputeMatchMaxSkyLocNoPhase
+from .overlap_cpu import SBankCythonComputeFiveCompMatch
 from .overlap_cpu import SBankWorkspaceCache as CPUWorkspaceCache
 
 # If considering enabling the GPU code, need to switch this as well.
@@ -64,3 +65,33 @@ def SBankComputeMatchSkyLoc(hp, hc, hphccorr, proposal, workspace_cache1,
             workspace_cache1,
             workspace_cache2
         )
+
+def SBankComputeFiveCompMatch(h1, h2, h3, h4, h5, proposal, workspace_cache1,
+                              workspace_cache2, workspace_cache3,
+                              workspace_cache4, workspace_cache5):
+    """
+    ADD ME
+    """
+    assert(h1.deltaF == proposal.deltaF)
+    assert(h2.deltaF == proposal.deltaF)
+    assert(h3.deltaF == proposal.deltaF)
+    assert(h4.deltaF == proposal.deltaF)
+    assert(h5.deltaF == proposal.deltaF)
+    assert(h2.data.length == h1.data.length)
+    assert(h3.data.length == h1.data.length)
+    assert(h4.data.length == h1.data.length)
+    assert(h5.data.length == h1.data.length)
+    if proposal.data.length <= h1.data.length:
+        min_len = proposal.data.length
+    else:
+        min_len = h1.data.length
+
+    return SBankCythonComputeFiveCompMatch(h1.data.data, h2.data.data,
+                                           h3.data.data, h4.data.data,
+                                           h5.data.data, proposal.data.data,
+                                           min_len, h1.deltaF, 
+                                           workspace_cache1,
+                                           workspace_cache2,
+                                           workspace_cache3,
+                                           workspace_cache4,
+                                           workspace_cache5)

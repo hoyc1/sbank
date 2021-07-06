@@ -82,7 +82,11 @@ class Bank(object):
             self.compute_match = self._metric_match
         else:
             # The max over skyloc stuff needs a second cache
+            # And the 5Comps stuff neds 5
             self._workspace_cache = [SBankWorkspaceCache(),
+                                     SBankWorkspaceCache(),
+                                     SBankWorkspaceCache(),
+                                     SBankWorkspaceCache(),
                                      SBankWorkspaceCache()]
             self.compute_match = self._brute_match
 
@@ -186,6 +190,7 @@ class Bank(object):
         else:
             tmpbank = nhood
         if not tmpbank:
+            #print ("None in neighborhood")
             return (max_match, template)
 
         # sort the bank by its nearness to tmplt in mchirp
@@ -245,6 +250,7 @@ class Bank(object):
                 df /= 2.0
 
             if match > min_match:
+                #print ("Rejecting at", match)
                 return (match, tmplt)
 
             # record match and template params for highest match

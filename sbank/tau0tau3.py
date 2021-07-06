@@ -624,6 +624,40 @@ def single_spin_precessing_param_generator(flow, tmplt_class, bank, **kwargs):
         yield tmplt_class(mass1, mass2, spin1x, spin1y, spin1z, theta, phi,
                           iota, psi, bank=bank)
 
+def IMRPhenomPv2_precessing_param_generator(flow, tmplt_class, bank, **kwargs):
+    """
+    Currently a stub to test precessing template generation.
+    """
+    spin1_bounds = kwargs.pop('spin1', (0, 1.))
+    spin2_bounds = kwargs.pop('spin2', (0, 1.))
+
+    for mass1, mass2 in urand_tau0tau3_generator(flow, **kwargs):
+        # Choose the rest from hardcoded limits
+        spin1mag = uniform(*spin1_bounds)
+        spin2mag = uniform(*spin2_bounds)
+        spin1ang1 = uniform(0, numpy.pi)
+        spin1ang2 = uniform(0, 2*numpy.pi)
+        spin2ang1 = uniform(0, numpy.pi)
+        spin2ang2 = uniform(0, 2*numpy.pi)
+        spin1z = spin1mag * numpy.cos(spin1ang1)
+        spin1x = spin1mag * numpy.sin(spin1ang1) * numpy.cos(spin1ang2)
+        spin1y = spin1mag * numpy.sin(spin1ang1) * numpy.sin(spin1ang2)
+        spin2z = spin2mag * numpy.cos(spin2ang1)
+        spin2x = spin2mag * numpy.sin(spin2ang1) * numpy.cos(spin2ang2)
+        spin2y = spin2mag * numpy.sin(spin2ang1) * numpy.sin(spin2ang2)
+
+        thetaJN = uniform(0, numpy.pi)
+        alpha0 = uniform(0, 2*numpy.pi)
+        phi0 = uniform(0, 2*numpy.pi)
+        # Check orientation angles use correct limits
+        theta = uniform(0, numpy.pi)
+        phi = uniform(0, 2*numpy.pi)
+        psi = uniform(0, 2*numpy.pi)
+        yield tmplt_class(mass1, mass2, spin1x, spin1y, spin1z, spin2x, spin2y,
+                          spin2z, thetaJN, alpha0, phi0, theta, phi, psi,
+                          bank=bank)
+
+
 
 def SpinTaylorT4_param_generator(flow, tmplt_class, bank, **kwargs):
     # FIXME implement!
@@ -704,6 +738,7 @@ proposals = {
     "TaylorF2": aligned_spin_param_generator,
     "IMRPhenomP": double_spin_precessing_param_generator,
     "IMRPhenomPv2": double_spin_precessing_param_generator,
+    "IMRPhenomPv2_THA": double_spin_precessing_param_generator,
     "IMRPhenomPv3": double_spin_precessing_param_generator,
     "TaylorF2RedSpin": aligned_spin_param_generator,
     "EOBNRv2": nonspin_param_generator,

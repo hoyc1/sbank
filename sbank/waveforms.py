@@ -29,6 +29,7 @@ from lal import CreateREAL8Vector, CreateCOMPLEX8FrequencySeries
 from ligo.lw.lsctables import SnglInspiralTable as llwsit
 
 from .overlap import SBankComputeMatchSkyLoc, SBankComputeMatch
+from .overlap import SBankComputeFiveCompMatch
 from .psds import get_neighborhood_PSD, get_ASD
 from .tau0tau3 import m1m2_to_tau0tau3
 
@@ -93,6 +94,12 @@ def compute_correlation(htilde1, htilde2, deltaF):
     # vdot is dot with complex conjugation
     return float(np.vdot(htilde1, htilde2).real * 4 * deltaF)
 
+def compute_complex_correlation(htilde1, htilde2, deltaF):
+    """
+    Find the complex correlation between htilde1 and htilde2.
+    """
+    # vdot is dot with complex conjugation
+    return np.vdot(htilde1, htilde2) * 4 * deltaF
 
 def FrequencySeries_to_COMPLEX8FrequencySeries(fs):
     """
@@ -789,7 +796,11 @@ class PrecessingSpinTemplate(AlignedSpinTemplate):
         hp, hc, hphccorr = self.get_whitened_normalized_comps(df, **kwargs)
 
         # Proposal generates h(t), sky loc is later discarded.
-        proposal = other.get_whitened_normalized(df, **kwargs)
+        try:
+            proposal = other.get_whitened_normalized(df, **kwargs)
+        except RuntimeError:
+            # Waveform generation failed. Bad, but try to carry on
+            return 1
 
         # maximize over sky position of template
         return SBankComputeMatchSkyLoc(hp, hc, hphccorr,
@@ -981,6 +992,289 @@ class IMRPhenomPv2Template(IMRPrecessingSpinTemplate):
 class IMRPhenomPv3Template(IMRPrecessingSpinTemplate):
     approximant = "IMRPhenomPv3"
 
+class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
+    """
+    """
+    #param_names = ("m1", "m2", "spin1x", "spin1y", "spin1z", "spin2x",
+    #               "spin2y", "spin2z", "thetaJN",
+    #               "alpha0", "phi0", "theta", "phi", "psi")
+    #param_formats = ("%.2f", "%.2f", "%.2f", "%.2f", "%.2f", "%.2f",
+    #                 "%.2f", "%.2f", "%.2f", "%.2f", "%.2f")
+    #__slots__ = param_names + ("bank", "tau0", "_dur",
+    #                           "_mchirp", "_wf_hp", "_wf_hc", "_hpsigmasq",
+    #                           "_hcsigmasq", "_hphccorr")
+    #hdf_dtype = [('m1', float32), ('m2', float32), ('chi1_l', float32),
+    #             ('chi2_l', float32), ('chip', float32), ('thetaJN', float32),
+    #             ('alpha0', float32), ('phi0', float32), ('theta', float32),
+    #             ('phi', float32), ('psi', float32)]
+    approximant = "IMRPhenomPv2"
+
+    def __init__(self, m1, m2, spin1x, spin1y, spin1z, spin2x, spin2y, spin2z,
+                 theta, phi, iota, psi, orb_phase, bank, flow=None,
+                 duration=None):
+
+
+        AlignedSpinTemplate.__init__(self, m1, m2, spin1z, spin2z, bank,
+                                     flow=flow, duration=duration)
+
+        self.spin1x = float(spin1x)
+        self.spin1y = float(spin1y)
+        self.spin2x = float(spin2x)
+        self.spin2y = float(spin2y)
+
+        self.theta = float(theta)
+        self.phi = float(phi)
+        self.iota = float(iota)
+        self.psi = float(psi)
+        self.orb_phase = float(orb_phase)
+
+        outs = lalsim.SimIMRPhenomPCalculateModelParametersFromSourceFrame(
+            self.m1, 
+            self.m2,
+            self.flow,
+            self.orb_phase,
+            self.iota,
+            self.spin1x, 
+            self.spin1y,
+            self.spin1z,
+            self.spin2x,
+            self.spin2y,
+            self.spin2z,
+            lalsim.IMRPhenomPv2_V
+        )          
+        chi1_l, chi2_l, chip, thetaJN, alpha0, phi_aligned, zeta_polariz = outs
+
+        self.chi1_l = float(chi1_l)
+        self.chi2_l = float(chi2_l)
+        self.chip = float(chip)
+        self.thetaJN = float(thetaJN)
+        self.alpha0 = float(alpha0)
+        self.phi0 = float(phi_aligned)
+        self.theta = float(theta)
+        self.phi = float(phi)
+        self.psi = float(psi)
+        # This is a correction on psi, currently unused
+        self.psi_corr = zeta_polariz
+
+        self._wf = {}
+        self._metric = None
+        self.sigmasq = 0.
+        self._wf_h1 = {}
+        self._wf_h2 = {}
+        self._wf_h3 = {}
+        self._wf_h4 = {}
+        self._wf_h5 = {}
+        self._h1sigmasq = {}
+        self._h2sigmasq = {}
+        self._h3sigmasq = {}
+        self._h4sigmasq = {}
+        self._h5sigmasq = {}
+
+    def _compute_waveform_five_comps(self, df, f_final):
+        def gen_phenom_p_comp(thetaJN, alpha0, phi0):
+            return lalsim.SimIMRPhenomP(
+                self.chi1_l,
+                self.chi2_l,
+                self.chip,
+                thetaJN,
+                self.m1*MSUN_SI,
+                self.m2*MSUN_SI,
+                1.e6*PC_SI,
+                alpha0,
+                phi0,
+                df,
+                self.flow,
+                f_final,
+                self.flow,
+                lalsim.IMRPhenomPv2_V,
+                lalsim.NoNRT_V,
+                None
+            )
+
+        hgen1a, _  = gen_phenom_p_comp(0., 0., 0.)
+        # hgen1b is negative w.r.t. 1908.05707
+        _, hgen1b = gen_phenom_p_comp(0., 0., np.pi/4.)
+        # These are both negative w.r.t 1908.05707
+        _, hgen2a = gen_phenom_p_comp(np.pi/2., 0., np.pi/4.)
+        _, hgen2b = gen_phenom_p_comp(np.pi/2., np.pi/2., 0.)
+        hgen3a, _ = gen_phenom_p_comp(np.pi/2., 0., 0.)
+        hgen3b, _ = gen_phenom_p_comp(np.pi/2., np.pi/2., 0.)
+
+        # Edit these arrays in place to avoid defining new LAL arrays
+        tmp = hgen1a.data.data[:] + hgen1b.data.data[:]
+        hgen1b.data.data[:] = (hgen1a.data.data[:] - hgen1b.data.data[:])/2.
+        hgen1a.data.data[:] = tmp / 2.
+        h1 = hgen1a
+        h5 = hgen1b
+        
+        tmp = hgen2a.data.data[:] + hgen2b.data.data[:]
+        hgen2b.data.data[:] = 0.25 * (hgen2a.data.data[:] - hgen2b.data.data[:])
+        hgen2a.data.data[:] = 0.25 * tmp
+        h2 = hgen2a
+        h4 = hgen2b
+        hgen3a.data.data[:] = \
+            1./6. * (hgen3a.data.data[:] + hgen3b.data.data[:])
+        h3 = hgen3a
+
+        return h1, h2, h3, h4, h5
+
+    def get_whitened_normalized_comps(self, df, ASD=None, PSD=None):
+        """
+        Return a COMPLEX8FrequencySeries of h+ and hx, whitened by the
+        given ASD and normalized. The waveform is not zero-padded to
+        match the length of the ASD, so its normalization depends on
+        its own length.
+        """
+        if df not in self._wf_h1:
+            # Clear self._wf as it won't be needed any more if calling here
+            self._wf = {}
+            # Generate a new wf
+            h1, h2, h3, h4, h5 = self._compute_waveform_five_comps(df, self.f_final)
+            if ASD is None:
+                ASD = PSD**0.5
+            if h1.data.length > len(ASD):
+                err_msg = "waveform has length greater than ASD; cannot whiten"
+                raise ValueError(err_msg)
+            arr_view_h1 = h1.data.data
+            arr_view_h2 = h2.data.data
+            arr_view_h3 = h3.data.data
+            arr_view_h4 = h4.data.data
+            arr_view_h5 = h5.data.data
+
+            # Whiten
+            arr_view_h1[:] /= ASD[:h1.data.length]
+            arr_view_h1[:int(self.flow / df)] = 0.
+            arr_view_h1[int(self.f_final/df):h1.data.length] = 0.
+
+            arr_view_h2[:] /= ASD[:h2.data.length]
+            arr_view_h2[:int(self.flow / df)] = 0.
+            arr_view_h2[int(self.f_final/df):h2.data.length] = 0.
+
+            arr_view_h3[:] /= ASD[:h3.data.length]
+            arr_view_h3[:int(self.flow / df)] = 0.
+            arr_view_h3[int(self.f_final/df):h3.data.length] = 0.
+
+            arr_view_h4[:] /= ASD[:h4.data.length]
+            arr_view_h4[:int(self.flow / df)] = 0.
+            arr_view_h4[int(self.f_final/df):h4.data.length] = 0.
+
+            arr_view_h5[:] /= ASD[:h5.data.length]
+            arr_view_h5[:int(self.flow / df)] = 0.
+            arr_view_h5[int(self.f_final/df):h5.data.length] = 0.
+
+
+            # Get normalization factors and normalize
+            self._h1sigmasq[df] = compute_sigmasq(arr_view_h1, df)
+            self._h2sigmasq[df] = compute_sigmasq(arr_view_h2, df)
+            self._h3sigmasq[df] = compute_sigmasq(arr_view_h3, df)
+            self._h4sigmasq[df] = compute_sigmasq(arr_view_h4, df)
+            self._h5sigmasq[df] = compute_sigmasq(arr_view_h5, df)
+            arr_view_h1[:] /= self._h1sigmasq[df]**0.5
+            arr_view_h2[:] /= self._h2sigmasq[df]**0.5
+            arr_view_h3[:] /= self._h3sigmasq[df]**0.5
+            arr_view_h4[:] /= self._h4sigmasq[df]**0.5
+            arr_view_h5[:] /= self._h5sigmasq[df]**0.5
+
+            h1h2corr = compute_complex_correlation(arr_view_h1, arr_view_h2, df)
+            h1h3corr = compute_complex_correlation(arr_view_h1, arr_view_h3, df)
+            h1h4corr = compute_complex_correlation(arr_view_h1, arr_view_h4, df)
+            h1h5corr = compute_complex_correlation(arr_view_h1, arr_view_h5, df)
+
+            arr_view_h2[:] = \
+                arr_view_h2[:] - h1h2corr * arr_view_h1[:]
+            arr_view_h3[:] = \
+                arr_view_h3[:] - h1h3corr * arr_view_h1[:]
+            arr_view_h4[:] = \
+                arr_view_h4[:] - h1h4corr * arr_view_h1[:]
+            arr_view_h5[:] = \
+                arr_view_h5[:] - h1h5corr * arr_view_h1[:]
+
+            self._h2sigmasq[df] = compute_sigmasq(arr_view_h2, df)
+            self._h3sigmasq[df] = compute_sigmasq(arr_view_h3, df)
+            self._h4sigmasq[df] = compute_sigmasq(arr_view_h4, df)
+            self._h5sigmasq[df] = compute_sigmasq(arr_view_h5, df)
+            arr_view_h2[:] /= self._h2sigmasq[df]**0.5
+            arr_view_h3[:] /= self._h3sigmasq[df]**0.5
+            arr_view_h4[:] /= self._h4sigmasq[df]**0.5
+            arr_view_h5[:] /= self._h5sigmasq[df]**0.5
+
+            h2h3corr = compute_complex_correlation(arr_view_h2, arr_view_h3, df)
+            h2h4corr = compute_complex_correlation(arr_view_h2, arr_view_h4, df)
+            h2h5corr = compute_complex_correlation(arr_view_h2, arr_view_h5, df)
+            arr_view_h3[:] = \
+                arr_view_h3[:] - h2h3corr * arr_view_h2[:]
+            arr_view_h4[:] = \
+                arr_view_h4[:] - h2h4corr * arr_view_h2[:]
+            arr_view_h5[:] = \
+                arr_view_h5[:] - h2h5corr * arr_view_h2[:]
+            self._h3sigmasq[df] = compute_sigmasq(arr_view_h3, df)
+            self._h4sigmasq[df] = compute_sigmasq(arr_view_h4, df)
+            self._h5sigmasq[df] = compute_sigmasq(arr_view_h5, df)
+            arr_view_h3[:] /= self._h3sigmasq[df]**0.5
+            arr_view_h4[:] /= self._h4sigmasq[df]**0.5
+            arr_view_h5[:] /= self._h5sigmasq[df]**0.5
+
+            h3h4corr = compute_complex_correlation(arr_view_h3, arr_view_h4, df)
+            h3h5corr = compute_complex_correlation(arr_view_h3, arr_view_h5, df)
+            arr_view_h4[:] = \
+                arr_view_h4[:] - h3h4corr * arr_view_h3[:]
+            arr_view_h5[:] = \
+                arr_view_h5[:] - h3h5corr * arr_view_h3[:]
+            self._h4sigmasq[df] = compute_sigmasq(arr_view_h4, df)
+            self._h5sigmasq[df] = compute_sigmasq(arr_view_h5, df)
+            arr_view_h4[:] /= self._h4sigmasq[df]**0.5
+            arr_view_h5[:] /= self._h5sigmasq[df]**0.5
+
+            h4h5corr = compute_complex_correlation(arr_view_h4, arr_view_h5, df)
+            arr_view_h5[:] = \
+                arr_view_h5[:] - h4h5corr * arr_view_h4[:]
+            self._h5sigmasq[df] = compute_sigmasq(arr_view_h5, df)
+            arr_view_h5[:] /= self._h5sigmasq[df]**0.5
+
+            self._wf_h1[df] = FrequencySeries_to_COMPLEX8FrequencySeries(h1)
+            self._wf_h2[df] = FrequencySeries_to_COMPLEX8FrequencySeries(h2)
+            self._wf_h3[df] = FrequencySeries_to_COMPLEX8FrequencySeries(h3)
+            self._wf_h4[df] = FrequencySeries_to_COMPLEX8FrequencySeries(h4)
+            self._wf_h5[df] = FrequencySeries_to_COMPLEX8FrequencySeries(h5)
+
+            arr_view_h1 = self._wf_h1[df].data.data
+            arr_view_h2 = self._wf_h2[df].data.data
+            arr_view_h3 = self._wf_h3[df].data.data
+            arr_view_h4 = self._wf_h4[df].data.data
+            arr_view_h5 = self._wf_h5[df].data.data
+            hs = [arr_view_h1, arr_view_h2, arr_view_h3, arr_view_h4, arr_view_h5]
+            #for i in range(5):
+            #    for j in range(i+1,5):
+            #        cc = compute_complex_correlation(hs[i], hs[j], df)
+            #        if abs(cc) > 1E-5:
+            #            print("ORTHOGONAL?", i, j, cc)
+
+        return (self._wf_h1[df], self._wf_h2[df], self._wf_h3[df],
+                self._wf_h4[df], self._wf_h5[df])
+
+    def brute_match(self, other, df, workspace_cache, **kwargs):
+
+        # Template generates hp and hc
+        h1, h2, h3, h4, h5 = self.get_whitened_normalized_comps(df, **kwargs)
+
+        # Proposal generates h(t), sky loc is later discarded.
+        try:
+            proposal = other.get_whitened_normalized(df, **kwargs)
+        except RuntimeError:
+            # Waveform generation failed. Bad, but try to carry on
+            return 1
+
+        # maximize over sky position of template
+        value = SBankComputeFiveCompMatch(h1, h2, h3, h4, h5,
+                                         proposal, workspace_cache[0],
+                                         workspace_cache[1], workspace_cache[2],
+                                         workspace_cache[3], workspace_cache[4])
+
+        #if not isnan(value):
+        #    if value > 0.99:
+        #        print ("MATCH OF", value)
+        return value
+
 
 class HigherOrderModeTemplate(PrecessingSpinTemplate):
     """Class for higher order mode templates.
@@ -1043,6 +1337,7 @@ waveforms = {
     "IMRPhenomD": IMRPhenomDTemplate,
     "IMRPhenomP": IMRPhenomPTemplate,
     "IMRPhenomPv2": IMRPhenomPv2Template,
+    "IMRPhenomPv2_THA": IMRPhenomPv2THATemplate,
     "IMRPhenomPv3": IMRPhenomPv3Template,
     "SEOBNRv2": SEOBNRv2Template,
     "SEOBNRv2_ROM_DoubleSpin": SEOBNRv2ROMDoubleSpinTemplate,
