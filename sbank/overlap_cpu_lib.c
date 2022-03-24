@@ -61,7 +61,7 @@ double _SBankComputeMatchMaxSkyLocNoPhase(complex *hp, complex *hc, const double
 double _SBankComputeFiveCompMatch(complex *temp_comp1, complex *temp_comp2,
                                   complex *temp_comp3, complex *temp_comp4,
                                   complex *temp_comp5, complex *proposal,
-                                  size_t min_len, double delta_f, 
+                                  size_t min_len, double delta_f, int8_t num_comps,
                                   WS *workspace_cache1,
                                   WS *workspace_cache2, WS *workspace_cache3,
                                   WS *workspace_cache4, WS *workspace_cache5);
@@ -385,7 +385,7 @@ double _SBankComputeMatchMaxSkyLocNoPhase(complex *hp, complex *hc, const double
 double _SBankComputeFiveCompMatch(complex *temp_comp1, complex *temp_comp2,
                                   complex *temp_comp3, complex *temp_comp4,
                                   complex *temp_comp5, complex *proposal,
-                                  size_t min_len, double delta_f,
+                                  size_t min_len, double delta_f, int8_t num_comps,
                                   WS *workspace_cache1,
                                   WS *workspace_cache2, WS *workspace_cache3,
                                   WS *workspace_cache4, WS *workspace_cache5)
@@ -423,14 +423,22 @@ double _SBankComputeFiveCompMatch(complex *temp_comp1, complex *temp_comp2,
      * so we should only fill the positive frequencies (first half of zf). */
     multiply_conjugate(ws1->zf->data, temp_comp1, proposal, min_len);
     XLALCOMPLEX8VectorFFT(ws1->zt, ws1->zf, ws1->plan); /* plan is reverse */
-    multiply_conjugate(ws2->zf->data, temp_comp2, proposal, min_len);
-    XLALCOMPLEX8VectorFFT(ws2->zt, ws2->zf, ws2->plan);
-    multiply_conjugate(ws3->zf->data, temp_comp3, proposal, min_len);
-    XLALCOMPLEX8VectorFFT(ws3->zt, ws3->zf, ws3->plan);
-    multiply_conjugate(ws4->zf->data, temp_comp4, proposal, min_len);
-    XLALCOMPLEX8VectorFFT(ws4->zt, ws4->zf, ws4->plan);
-    multiply_conjugate(ws5->zf->data, temp_comp5, proposal, min_len);
-    XLALCOMPLEX8VectorFFT(ws5->zt, ws5->zf, ws5->plan);
+    if (num_comps > 1) {
+        multiply_conjugate(ws2->zf->data, temp_comp2, proposal, min_len);
+	XLALCOMPLEX8VectorFFT(ws2->zt, ws2->zf, ws2->plan);
+    }
+    if (num_comps > 2) {
+        multiply_conjugate(ws3->zf->data, temp_comp3, proposal, min_len);
+	XLALCOMPLEX8VectorFFT(ws3->zt, ws3->zf, ws3->plan);
+    }
+    if (num_comps > 3) {
+        multiply_conjugate(ws4->zf->data, temp_comp4, proposal, min_len);
+	XLALCOMPLEX8VectorFFT(ws4->zt, ws4->zf, ws4->plan);
+    }
+    if (num_comps > 4) {
+        multiply_conjugate(ws5->zf->data, temp_comp5, proposal, min_len);
+	XLALCOMPLEX8VectorFFT(ws5->zt, ws5->zf, ws5->plan);
+    }
 
     /* maximize over |z(t)|^2 */
     float complex *zdata1 = ws1->zt->data;
@@ -443,8 +451,20 @@ double _SBankComputeFiveCompMatch(complex *temp_comp1, complex *temp_comp2,
     ssize_t argmax = -1;
     double max = 0.;
     for (;k--;) {
-        double temp = abs2(zdata1[k]) + abs2(zdata2[k]) + abs2(zdata3[k])
-                    + abs2(zdata4[k]) + abs2(zdata5[k]);
+      double temp = 0.;
+        if (num_comps == 1) {
+	    temp = abs2(zdata1[k]);
+	} else if (num_comps == 2) {
+	    temp = abs2(zdata1[k]) + abs2(zdata2[k]);
+	} else if (num_comps == 3) {
+	    temp = abs2(zdata1[k]) + abs2(zdata2[k]) + abs2(zdata3[k]);
+	} else if (num_comps == 4) {
+	    temp = abs2(zdata1[k]) + abs2(zdata2[k]) + abs2(zdata3[k])
+	         + abs2(zdata4[k]);
+	} else if (num_comps == 5) {
+	    temp = abs2(zdata1[k]) + abs2(zdata2[k]) + abs2(zdata3[k])
+	         + abs2(zdata4[k]) + abs2(zdata5[k]);
+	}
         if (temp > max) {
             argmax = k;
             max = temp;

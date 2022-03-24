@@ -66,12 +66,13 @@ def SBankComputeMatchSkyLoc(hp, hc, hphccorr, proposal, workspace_cache1,
             workspace_cache2
         )
 
-def SBankComputeFiveCompMatch(h1, h2, h3, h4, h5, proposal, workspace_cache1,
+def SBankComputeFiveCompMatch(h1, h2, h3, h4, h5, proposal, num_comps, workspace_cache1,
                               workspace_cache2, workspace_cache3,
                               workspace_cache4, workspace_cache5):
     """
     ADD ME
     """
+    assert(1 <= num_comps <= 5)
     assert(h1.deltaF == proposal.deltaF)
     assert(h2.deltaF == proposal.deltaF)
     assert(h3.deltaF == proposal.deltaF)
@@ -89,7 +90,7 @@ def SBankComputeFiveCompMatch(h1, h2, h3, h4, h5, proposal, workspace_cache1,
     return SBankCythonComputeFiveCompMatch(h1.data.data, h2.data.data,
                                            h3.data.data, h4.data.data,
                                            h5.data.data, proposal.data.data,
-                                           min_len, h1.deltaF, 
+                                           min_len, h1.deltaF, num_comps,
                                            workspace_cache1,
                                            workspace_cache2,
                                            workspace_cache3,

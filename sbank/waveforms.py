@@ -21,7 +21,7 @@ import logging
 import sys
 from math import isnan
 import numpy as np
-from numpy import float32
+from numpy import float32, int16
 import lal
 import lalsimulation as lalsim
 from lal import MSUN_SI, MTSUN_SI, PC_SI, PI
@@ -995,6 +995,19 @@ class IMRPhenomPv3Template(IMRPrecessingSpinTemplate):
 class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
     """
     """
+    param_names = ("m1", "m2", "spin1x", "spin1y", "spin1z", "spin2x",
+                   "spin2y", "spin2z", "theta", "phi", "iota", "psi", "num_comps")
+    param_formats = ("%.2f", "%.2f", "%.2f", "%.2f", "%.2f", "%.2f",
+                     "%.2f", "%.2f", "%.2f", "%.2f", "%.2f", "%.2f", "%d")
+    __slots__ = param_names + ("bank", "chieff", "chipre", "tau0", "_dur",
+                               "_mchirp", "_wf_hp", "_wf_hc", "_hpsigmasq",
+                               "_hcsigmasq", "_hphccorr")
+    hdf_dtype = AlignedSpinTemplate.hdf_dtype + \
+        [('spin1x', float32), ('spin1y', float32), ('spin2x', float32),
+         ('spin2y', float32), ('latitude', float32), ('longitude', float32),
+         ('polarization', float32), ('inclination', float32),
+         ('orbital_phase', float32), ('num_comps', int16)]
+
     #param_names = ("m1", "m2", "spin1x", "spin1y", "spin1z", "spin2x",
     #               "spin2y", "spin2z", "thetaJN",
     #               "alpha0", "phi0", "theta", "phi", "psi")
@@ -1011,7 +1024,7 @@ class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
 
     def __init__(self, m1, m2, spin1x, spin1y, spin1z, spin2x, spin2y, spin2z,
                  theta, phi, iota, psi, orb_phase, bank, flow=None,
-                 duration=None):
+                 duration=None, num_comps=5):
 
 
         AlignedSpinTemplate.__init__(self, m1, m2, spin1z, spin2z, bank,
@@ -1027,6 +1040,8 @@ class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
         self.iota = float(iota)
         self.psi = float(psi)
         self.orb_phase = float(orb_phase)
+
+        self.num_comps = int(num_comps)
 
         outs = lalsim.SimIMRPhenomPCalculateModelParametersFromSourceFrame(
             self.m1, 
@@ -1252,7 +1267,11 @@ class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
         return (self._wf_h1[df], self._wf_h2[df], self._wf_h3[df],
                 self._wf_h4[df], self._wf_h5[df])
 
-    def brute_match(self, other, df, workspace_cache, **kwargs):
+    def brute_match(self, other, df, workspace_cache, num_comps_diff=0, **kwargs):
+
+        num_comps = self.num_comps + num_comps_diff
+        if (num_comps < 1) or (num_comps > 5):
+            return 0
 
         # Template generates hp and hc
         h1, h2, h3, h4, h5 = self.get_whitened_normalized_comps(df, **kwargs)
@@ -1265,15 +1284,93 @@ class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
             return 1
 
         # maximize over sky position of template
-        value = SBankComputeFiveCompMatch(h1, h2, h3, h4, h5,
-                                         proposal, workspace_cache[0],
-                                         workspace_cache[1], workspace_cache[2],
-                                         workspace_cache[3], workspace_cache[4])
+        value = SBankComputeFiveCompMatch(
+            h1, h2, h3, h4, h5,
+            proposal, num_comps, workspace_cache[0],
+            workspace_cache[1], workspace_cache[2],
+            workspace_cache[3], workspace_cache[4]
+        )
 
         #if not isnan(value):
         #    if value > 0.99:
         #        print ("MATCH OF", value)
         return value
+
+    @classmethod
+    def from_sim(cls, sim, bank):
+        # theta = polar angle wrt overhead
+        #       = pi/2 - latitude (which is 0 on the horizon)
+        return cls(sim.mass1, sim.mass2, sim.spin1x, sim.spin1y, sim.spin1z,
+                   sim.spin2x, sim.spin2y, sim.spin2z, np.pi/2 - sim.latitude,
+                   sim.longitude, sim.inclination, sim.polarization,
+                   sim.coa_phase, bank, num_comps=sim.num_comps)
+
+    @classmethod
+    def from_sngl(cls, sngl, bank):
+        # FIXME: Using alpha columns to hold theta, phi, iota, psi
+        return cls(sngl.mass1, sngl.mass2, sngl.spin1x, sngl.spin1y,
+                   sngl.spin1z, sngl.spin2x, sngl.spin2y, sngl.spin2z,
+                   sngl.alpha1, sngl.alpha2, sngl.alpha3, sngl.alpha4,
+                   sngl.alpha5, bank, ncom=sngl.num_comps)
+
+    @classmethod
+    def from_dict(cls, params, idx, bank):
+        flow = float(params['f_lower'][idx])
+        if not flow > 0:
+            flow = None
+        duration = float(params['template_duration'][idx])
+        if not duration > 0:
+            duration = None
+        return cls(params['mass1'][idx], params['mass2'][idx],
+                   params['spin1x'][idx], params['spin1y'][idx],
+                   params['spin1z'][idx], params['spin2x'][idx],
+                   params['spin2y'][idx], params['spin2z'][idx],
+                   params['latitude'][idx], params['longitude'][idx],
+                   params['polarization'][idx], params['inclination'][idx],
+                   params['orbital_phase'][idx], bank,
+                   flow=flow, duration=duration, num_comps=params['num_comps'][idx])
+
+    def to_sngl(self):
+        # All numerical values are initiated as 0 and all strings as ''
+        row = SnglInspiralTable()
+        row.mass1 = self.m1
+        row.mass2 = self.m2
+        row.mtotal = self.m1 + self.m2
+        row.mchirp = self._mchirp
+        row.eta = row.mass1 * row.mass2 / (row.mtotal * row.mtotal)
+        row.tau0, row.tau3 = m1m2_to_tau0tau3(self.m1, self.m2, self.flow)
+        row.template_duration = self.dur
+        row.spin1x = self.spin1x
+        row.spin1y = self.spin1y
+        row.spin1z = self.spin1z
+        row.spin2x = self.spin2x
+        row.spin2y = self.spin2y
+        row.spin2z = self.spin2z
+        row.alpha1 = self.theta
+        row.alpha2 = self.phi
+        row.alpha3 = self.iota
+        row.alpha4 = self.psi
+        row.alpha5 = self.orb_phase
+        row.alpha6 = self.num_comps
+        row.sigmasq = self.sigmasq
+        if self.bank.flow_column:
+            setattr(row, self.bank.flow_column, self.flow)
+        return row
+
+    def to_storage_arr(self):
+        """Dump the template params to a numpy array."""
+        new_tmplt = super(PrecessingSpinTemplate, self).to_storage_arr()
+        new_tmplt['spin1x'] = self.spin1x
+        new_tmplt['spin1y'] = self.spin1y
+        new_tmplt['spin2x'] = self.spin2x
+        new_tmplt['spin2y'] = self.spin2y
+        new_tmplt['latitude'] = self.theta
+        new_tmplt['longitude'] = self.phi
+        new_tmplt['polarization'] = self.psi
+        new_tmplt['inclination'] = self.iota
+        new_tmplt['orbital_phase'] = self.orb_phase
+        new_tmplt['num_comps'] = self.num_comps
+        return new_tmplt
 
 
 class HigherOrderModeTemplate(PrecessingSpinTemplate):

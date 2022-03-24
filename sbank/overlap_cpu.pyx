@@ -11,7 +11,7 @@ cdef extern from "overlap_cpu_lib.c":
     double _SBankComputeRealMatch(float complex *inj, float complex *tmplt, size_t min_len, double delta_f, WS *workspace_cache)
     double _SBankComputeMatchMaxSkyLoc(float complex *hp, float complex *hc, const double hphccorr, float complex *proposal, size_t min_len, double delta_f, WS *workspace_cache1, WS *workspace_cache2)
     double _SBankComputeMatchMaxSkyLocNoPhase(float complex *hp, float complex *hc, const double hphccorr, float complex *proposal, size_t min_len, double delta_f, WS *workspace_cache1, WS *workspace_cache2)
-    double _SBankComputeFiveCompMatch(float complex *temp_comp1, float complex *temp_comp2, float complex *temp_comp3, float complex *temp_comp4, float complex *temp_comp5, float complex *proposal, size_t min_len, double delta_f, WS *workspace_cache1, WS *workspace_cache2, WS *workspace_cache3, WS *workspace_cache4, WS *workspace_cache5)
+    double _SBankComputeFiveCompMatch(float complex *temp_comp1, float complex *temp_comp2, float complex *temp_comp3, float complex *temp_comp4, float complex *temp_comp5, float complex *proposal, size_t min_len, double delta_f, int num_comps, WS *workspace_cache1, WS *workspace_cache2, WS *workspace_cache3, WS *workspace_cache4, WS *workspace_cache5)
 
 
 # WARNING: Handling C pointers in python gets nasty. The workspace item is
@@ -121,6 +121,7 @@ def SBankCythonComputeFiveCompMatch(
     numpy.ndarray[numpy.complex64_t, ndim=1, mode="c"] proposal,
     int min_len,
     double delta_f,
+    int num_comps,
     workspace_cache1,
     workspace_cache2,
     workspace_cache3,
@@ -138,5 +139,5 @@ def SBankCythonComputeFiveCompMatch(
     _workspace4 = SBankWorkspaceCache.get_workspace(workspace_cache4)
     _workspace5 = SBankWorkspaceCache.get_workspace(workspace_cache5)
 
-    return _SBankComputeFiveCompMatch(&temp_comp1[0], &temp_comp2[0], &temp_comp3[0], &temp_comp4[0], &temp_comp5[0], &proposal[0], min_len, delta_f, _workspace1, _workspace2, _workspace3, _workspace4, _workspace5)
+    return _SBankComputeFiveCompMatch(&temp_comp1[0], &temp_comp2[0], &temp_comp3[0], &temp_comp4[0], &temp_comp5[0], &proposal[0], min_len, delta_f, num_comps, _workspace1, _workspace2, _workspace3, _workspace4, _workspace5)
 

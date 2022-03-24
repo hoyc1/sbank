@@ -171,7 +171,7 @@ class Bank(object):
             tmplt.clear()
         return match
 
-    def covers(self, proposal, min_match, nhood=None):
+    def covers(self, proposal, min_match, nhood=None, **kwargs):
         """
         Return (max_match, template) where max_match is either (i) the
         best found match if max_match < min_match or (ii) the match of
@@ -222,7 +222,7 @@ class Bank(object):
                 PSD = get_PSD(self.coarse_match_df, self.flow, f_max,
                               self.noise_model)
                 match = self.compute_match(tmplt, proposal,
-                                           self.coarse_match_df, PSD=PSD)
+                                           self.coarse_match_df, PSD=PSD, **kwargs)
 
                 if (match > 0) and ((1 - match) > (0.05 + 1 - min_match)):
                     continue
@@ -230,7 +230,7 @@ class Bank(object):
             while df >= df_end:
 
                 PSD = get_PSD(df, self.flow, f_max, self.noise_model)
-                match = self.compute_match(tmplt, proposal, df, PSD=PSD)
+                match = self.compute_match(tmplt, proposal, df, PSD=PSD, **kwargs)
                 if match == 0:
                     match_last = -1
                     df /= 2.0
@@ -294,6 +294,20 @@ class Bank(object):
 
         for tmplt in self._templates:
             tmplt.clear()
+
+    def coalesce_tha(self):
+        self._templates.sort(key=attrgetter(self.nhood_param))
+        i, j = 0, 1
+        keep = []
+        while j <= len(self._templates):
+            iparam = getattr(self._template[i], self.nhood_param)
+            jparam = getattr(self._template[j], self.nhood_param)
+            if iparam != jparam or j == len(self._templates):
+                idx = np.argmax([t.num_comps for t in self._templates[i:j]])
+                keep += [i + idx]
+                i = j
+            j += 1
+        self._templates = [self._templates[i] for i in keep]
 
 
 def _find_neighborhood(tmplt_locs, prop_loc, nhood_size=0.25):
