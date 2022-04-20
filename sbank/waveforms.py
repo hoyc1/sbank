@@ -996,9 +996,11 @@ class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
     """
     """
     param_names = ("m1", "m2", "spin1x", "spin1y", "spin1z", "spin2x",
-                   "spin2y", "spin2z", "theta", "phi", "iota", "psi", "num_comps")
+                   "spin2y", "spin2z", "theta", "phi", "iota", "psi",
+                   "orb_phase", "num_comps")
     param_formats = ("%.2f", "%.2f", "%.2f", "%.2f", "%.2f", "%.2f",
-                     "%.2f", "%.2f", "%.2f", "%.2f", "%.2f", "%.2f", "%d")
+                     "%.2f", "%.2f", "%.2f", "%.2f", "%.2f", "%.2f",
+                     "%.2f", "%d")
     __slots__ = param_names + ("bank", "chieff", "chipre", "tau0", "_dur",
                                "_mchirp", "_wf_hp", "_wf_hc", "_hpsigmasq",
                                "_hcsigmasq", "_hphccorr")
@@ -1195,56 +1197,58 @@ class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
             h1h4corr = compute_complex_correlation(arr_view_h1, arr_view_h4, df)
             h1h5corr = compute_complex_correlation(arr_view_h1, arr_view_h5, df)
 
-            arr_view_h2[:] = \
-                arr_view_h2[:] - h1h2corr * arr_view_h1[:]
-            arr_view_h3[:] = \
-                arr_view_h3[:] - h1h3corr * arr_view_h1[:]
-            arr_view_h4[:] = \
-                arr_view_h4[:] - h1h4corr * arr_view_h1[:]
-            arr_view_h5[:] = \
-                arr_view_h5[:] - h1h5corr * arr_view_h1[:]
-
-            self._h2sigmasq[df] = compute_sigmasq(arr_view_h2, df)
-            self._h3sigmasq[df] = compute_sigmasq(arr_view_h3, df)
-            self._h4sigmasq[df] = compute_sigmasq(arr_view_h4, df)
-            self._h5sigmasq[df] = compute_sigmasq(arr_view_h5, df)
-            arr_view_h2[:] /= self._h2sigmasq[df]**0.5
-            arr_view_h3[:] /= self._h3sigmasq[df]**0.5
-            arr_view_h4[:] /= self._h4sigmasq[df]**0.5
-            arr_view_h5[:] /= self._h5sigmasq[df]**0.5
+            arr_view_h2[:] = (
+                (arr_view_h2[:] - h1h2corr * arr_view_h1[:])
+                / (1. - h1h2corr * h1h2corr.conj()) ** 0.5
+            )
+            arr_view_h3[:] = (
+                (arr_view_h3[:] - h1h3corr * arr_view_h1[:])
+                / (1. - h1h3corr * h1h3corr.conj()) ** 0.5
+            )
+            arr_view_h4[:] = (
+                (arr_view_h4[:] - h1h4corr * arr_view_h1[:])
+                / (1. - h1h4corr * h1h4corr.conj()) ** 0.5
+            )
+            arr_view_h5[:] = (
+                (arr_view_h5[:] - h1h5corr * arr_view_h1[:])
+                / (1. - h1h5corr * h1h5corr.conj()) ** 0.5
+            )
 
             h2h3corr = compute_complex_correlation(arr_view_h2, arr_view_h3, df)
             h2h4corr = compute_complex_correlation(arr_view_h2, arr_view_h4, df)
             h2h5corr = compute_complex_correlation(arr_view_h2, arr_view_h5, df)
-            arr_view_h3[:] = \
-                arr_view_h3[:] - h2h3corr * arr_view_h2[:]
-            arr_view_h4[:] = \
-                arr_view_h4[:] - h2h4corr * arr_view_h2[:]
-            arr_view_h5[:] = \
-                arr_view_h5[:] - h2h5corr * arr_view_h2[:]
-            self._h3sigmasq[df] = compute_sigmasq(arr_view_h3, df)
-            self._h4sigmasq[df] = compute_sigmasq(arr_view_h4, df)
-            self._h5sigmasq[df] = compute_sigmasq(arr_view_h5, df)
-            arr_view_h3[:] /= self._h3sigmasq[df]**0.5
-            arr_view_h4[:] /= self._h4sigmasq[df]**0.5
-            arr_view_h5[:] /= self._h5sigmasq[df]**0.5
+
+            arr_view_h3[:] = (
+                (arr_view_h3[:] - h2h3corr * arr_view_h2[:])
+                / (1. - h2h3corr * h2h3corr.conj()) ** 0.5
+            )
+            arr_view_h4[:] = (
+                (arr_view_h4[:] - h2h4corr * arr_view_h2[:])
+                / (1. - h2h4corr * h2h4corr.conj()) ** 0.5
+            )
+            arr_view_h5[:] = (
+                (arr_view_h5[:] - h2h5corr * arr_view_h2[:])
+                / (1. - h2h5corr * h2h5corr.conj()) ** 0.5
+            )
 
             h3h4corr = compute_complex_correlation(arr_view_h3, arr_view_h4, df)
             h3h5corr = compute_complex_correlation(arr_view_h3, arr_view_h5, df)
-            arr_view_h4[:] = \
-                arr_view_h4[:] - h3h4corr * arr_view_h3[:]
-            arr_view_h5[:] = \
-                arr_view_h5[:] - h3h5corr * arr_view_h3[:]
-            self._h4sigmasq[df] = compute_sigmasq(arr_view_h4, df)
-            self._h5sigmasq[df] = compute_sigmasq(arr_view_h5, df)
-            arr_view_h4[:] /= self._h4sigmasq[df]**0.5
-            arr_view_h5[:] /= self._h5sigmasq[df]**0.5
+
+            arr_view_h4[:] = (
+                (arr_view_h4[:] - h3h4corr * arr_view_h3[:])
+                / (1. - h3h4corr * h3h4corr.conj()) ** 0.5
+            )
+            arr_view_h5[:] = (
+                (arr_view_h5[:] - h3h5corr * arr_view_h3[:])
+                / (1. - h3h5corr * h3h5corr.conj()) ** 0.5
+            )
 
             h4h5corr = compute_complex_correlation(arr_view_h4, arr_view_h5, df)
-            arr_view_h5[:] = \
-                arr_view_h5[:] - h4h5corr * arr_view_h4[:]
-            self._h5sigmasq[df] = compute_sigmasq(arr_view_h5, df)
-            arr_view_h5[:] /= self._h5sigmasq[df]**0.5
+
+            arr_view_h5[:] = (
+                (arr_view_h5[:] - h4h5corr * arr_view_h4[:])
+                / (1. - h4h5corr * h4h5corr.conj()) ** 0.5
+            )
 
             self._wf_h1[df] = FrequencySeries_to_COMPLEX8FrequencySeries(h1)
             self._wf_h2[df] = FrequencySeries_to_COMPLEX8FrequencySeries(h2)
@@ -1258,20 +1262,17 @@ class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
             arr_view_h4 = self._wf_h4[df].data.data
             arr_view_h5 = self._wf_h5[df].data.data
             hs = [arr_view_h1, arr_view_h2, arr_view_h3, arr_view_h4, arr_view_h5]
-            #for i in range(5):
-            #    for j in range(i+1,5):
-            #        cc = compute_complex_correlation(hs[i], hs[j], df)
-            #        if abs(cc) > 1E-5:
-            #            print("ORTHOGONAL?", i, j, cc)
 
         return (self._wf_h1[df], self._wf_h2[df], self._wf_h3[df],
                 self._wf_h4[df], self._wf_h5[df])
 
-    def brute_match(self, other, df, workspace_cache, num_comps_diff=0, **kwargs):
+    def brute_match(self, other, df, workspace_cache, num_comps=None, **kwargs):
 
-        num_comps = self.num_comps + num_comps_diff
+        if num_comps is None:
+            num_comps = self.num_comps
+
         if (num_comps < 1) or (num_comps > 5):
-            return 0
+            raise ValueError("num_comps must be between 1 and 5")
 
         # Template generates hp and hc
         h1, h2, h3, h4, h5 = self.get_whitened_normalized_comps(df, **kwargs)
@@ -1291,9 +1292,6 @@ class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
             workspace_cache[3], workspace_cache[4]
         )
 
-        #if not isnan(value):
-        #    if value > 0.99:
-        #        print ("MATCH OF", value)
         return value
 
     @classmethod
@@ -1311,7 +1309,7 @@ class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
         return cls(sngl.mass1, sngl.mass2, sngl.spin1x, sngl.spin1y,
                    sngl.spin1z, sngl.spin2x, sngl.spin2y, sngl.spin2z,
                    sngl.alpha1, sngl.alpha2, sngl.alpha3, sngl.alpha4,
-                   sngl.alpha5, bank, ncom=sngl.num_comps)
+                   sngl.alpha5, bank, num_comps=sngl.alpha6)
 
     @classmethod
     def from_dict(cls, params, idx, bank):
@@ -1326,7 +1324,7 @@ class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
                    params['spin1z'][idx], params['spin2x'][idx],
                    params['spin2y'][idx], params['spin2z'][idx],
                    params['latitude'][idx], params['longitude'][idx],
-                   params['polarization'][idx], params['inclination'][idx],
+                   params['inclination'][idx], params['polarization'][idx],
                    params['orbital_phase'][idx], bank,
                    flow=flow, duration=duration, num_comps=params['num_comps'][idx])
 
