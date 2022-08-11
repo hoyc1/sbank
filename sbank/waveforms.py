@@ -112,6 +112,42 @@ def FrequencySeries_to_COMPLEX8FrequencySeries(fs):
     return new
 
 
+def compute_beta(tmplt):
+    """ Calculate beta (thetaJL) using code from
+    https://lscsoft.docs.ligo.org/lalsuite/lalsimulation/_l_a_l_sim_inspiral_8c_source.html#l06105
+    """
+    m1 = tmplt.m1
+    m2 = tmplt.m2
+    s1x = tmplt.spin1x
+    s1y = tmplt.spin1y
+    s1z = tmplt.spin1z
+    s2x = tmplt.spin2x
+    s2y = tmplt.spin2y
+    s2z = tmplt.spin2z
+    flow = tmplt.flow
+
+    eta = m1 * m2 / (m1 + m2) / (m1 + m2);
+    v0 = ((m1 + m2) * MTSUN_SI * PI * flow) ** (1. / 3.)
+
+    lmag = (m1 + m2) * (m1 + m2) * eta / v0
+    lmag *= (1.0 + v0 * v0 * (1.5 + eta / 6.))
+    
+    s1x = m1 * m1 * s1x
+    s1y = m1 * m1 * s1y
+    s1z = m1 * m1 * s1z
+    s2x = m2 * m2 * s2x
+    s2y = m2 * m2 * s2y
+    s2z = m2 * m2 * s2z
+    jx = s1x + s2x
+    jy = s1y + s2y
+    jz = lmag + s1z + s2z
+    
+    jnorm = (jx * jx + jy * jy + jz * jz) ** (1. / 2.)
+    jhatz = jz / jnorm
+
+    return np.arccos(jhatz)
+
+
 def create_moments(df, flow, len_PSD):
     # moments go from flow to fmax unlike the PSD, which starts at 0
     n = len_PSD - int(flow / df)
@@ -1073,6 +1109,8 @@ class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
         # This is a correction on psi, currently unused
         self.psi_corr = zeta_polariz
 
+        self.beta = compute_beta(self)
+
         self._wf = {}
         self._metric = None
         self.sigmasq = 0.
@@ -1132,8 +1170,10 @@ class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
         hgen3a.data.data[:] = \
             1./6. * (hgen3a.data.data[:] + hgen3b.data.data[:])
         h3 = hgen3a
+        
+        hs = (h1, h2, h3, h4, h5)
 
-        return h1, h2, h3, h4, h5
+        return hs
 
     def get_whitened_normalized_comps(self, df, ASD=None, PSD=None):
         """

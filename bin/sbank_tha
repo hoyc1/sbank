@@ -223,6 +223,8 @@ def parse_command_line():
     parser.add_option("--mchirp-min", help="Deprecated. Set minimum chirp-mass of the system (in solar masses)", type="float")
     parser.add_option("--mchirp-max", help="Deprecated. Set maximum chirp-mass of the system (in solar masses)", type="float")
 
+    parser.add_option("--max-num-comps", type="int", default=5, help="Maximum number of harmonics to be used.")
+
     opts, args = parser.parse_args()
 
     #
@@ -376,7 +378,7 @@ else:
 #
 # initialize the bank
 #
-bank = BankTHA(noise_model, opts.flow, cache_waveforms=opts.cache_waveforms, nhood_size=opts.neighborhood_size, nhood_param=opts.neighborhood_param, coarse_match_df=opts.coarse_match_df, iterative_match_df_max=opts.iterative_match_df_max, fhigh_max=opts.fhigh_max, optimize_flow=opts.optimize_flow, flow_column=opts.flow_column)
+bank = BankTHA(noise_model, opts.flow, cache_waveforms=opts.cache_waveforms, nhood_size=opts.neighborhood_size, nhood_param=opts.neighborhood_param, coarse_match_df=opts.coarse_match_df, iterative_match_df_max=opts.iterative_match_df_max, fhigh_max=opts.fhigh_max, optimize_flow=opts.optimize_flow, flow_column=opts.flow_column, max_num_comps=opts.max_num_comps)
 
 #
 # check for saved work
@@ -386,7 +388,7 @@ if opts.checkpoint and os.path.exists( opts.output_filename + "_checkpoint.gz" )
 
     xmldoc = utils.load_filename(opts.output_filename + "_checkpoint.gz", contenthandler=ContentHandler)
     tbl = lsctables.SnglInspiralTable.get_table(xmldoc)
-    [bank.insort(t) for t in BankTHA.from_sngls(tbl, tmplt_class, noise_model, opts.flow, cache_waveforms=opts.cache_waveforms, nhood_size=opts.neighborhood_size, nhood_param=opts.neighborhood_param, coarse_match_df=opts.coarse_match_df, iterative_match_df_max=opts.iterative_match_df_max, fhigh_max=opts.fhigh_max)]
+    [bank.insort(t) for t in BankTHA.from_sngls(tbl, tmplt_class, noise_model, opts.flow, cache_waveforms=opts.cache_waveforms, nhood_size=opts.neighborhood_size, nhood_param=opts.neighborhood_param, coarse_match_df=opts.coarse_match_df, iterative_match_df_max=opts.iterative_match_df_max, fhigh_max=opts.fhigh_max, max_num_comps=opts.max_num_comps)]
 
     if opts.verbose:
         print("Found checkpoint file %s with %d precomputed templates." % (opts.output_filename + "_checkpoint.gz", len(tbl)))
@@ -550,15 +552,21 @@ for tmplt in proposal:
     matches, templates = bank.covers(tmplt, opts.match_min, return_full=True)
     if (matches[0] < opts.match_min):
 
-        # set the proposal's num_comps to 0, this will only effect the
+        # Set the proposal's num_comps to 0, this will only effect the
         # generation of the harmonics, and means that all values of num_comps
-        # will be tested for this new template
-        tmplt.num_comps = 0
+        # will be tested.
+        # Do not do this for trial waveforms, we assume they already have an
+        # appropriate number of harmonics selected. (take 1 away from their
+        # num_comps so the current num_comps will be tested)
+        if not opts.trial_waveforms:
+            tmplt.num_comps = 0
+        else:
+            tmplt.num_comps -= 1
 
         if templates[0] is None:
             nhood = [tmplt]
         else:
-            nhood = templates + [tmplt]
+            nhood = [tmplt] + templates
 
         match, matcher, num_comps = bank.covers_harmonics(tmplt, opts.match_min,
                                                           nhood=nhood,

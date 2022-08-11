@@ -311,7 +311,7 @@ class BankTHA(Bank):
 
     def __init__(self, noise_model, flow, cache_waveforms=False, nhood_size=1.0,
                  nhood_param="tau0", coarse_match_df=None, iterative_match_df_max=None,
-                 fhigh_max=None, optimize_flow=None, flow_column=None):
+                 fhigh_max=None, optimize_flow=None, flow_column=None, max_num_comps=5):
 
         super(BankTHA, self).__init__(
             noise_model, flow,
@@ -329,6 +329,8 @@ class BankTHA(Bank):
                                  SBankWorkspaceCache(),
                                  SBankWorkspaceCache(),
                                  SBankWorkspaceCache()]
+        self.max_num_comps = max_num_comps
+
 
     def insort_idx(self, new):
         ind = bisect.bisect_left(self._nhoods, getattr(new, self.nhood_param))
@@ -404,18 +406,21 @@ class BankTHA(Bank):
         for tmplt in tmpbank:
 
             self._nmatch += 1
+            num_comps = min(tmplt.num_comps, self.max_num_comps)
 
             if self.coarse_match_df:
                 # Perform a match at high df to see if point can be quickly
                 # ruled out as already covering the proposal
-                match = self.tmplt_coarse(tmplt, proposal, f_max, **kwargs)
+                match = self.tmplt_coarse(tmplt, proposal, f_max,
+                                          num_comps=num_comps, **kwargs)
 
                 if (match > 0) and (match < rough_match):
                     matches += [match]
                     continue
 
             match = self.tmplt_df_iter(tmplt, proposal, df_start, df_end, f_max,
-                                       min_match=rough_match, **kwargs)
+                                       min_match=rough_match, num_comps=num_comps,
+                                       **kwargs)
             matches += [match]
 
             # record match and template params for highest match
@@ -485,7 +490,7 @@ class BankTHA(Bank):
 
         # iterate through the number of harmonics to test templates with
         # fewer harmonics first
-        for i in range(1, 6):
+        for i in range(1, self.max_num_comps + 1):
 
             # find and test matches
             for tmplt in tmpbank:
