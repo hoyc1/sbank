@@ -66,15 +66,20 @@ def ceil_pow_2(number):
 #
 # Represent template waveforms
 #
+def compute_fplus_fcross(theta, phi, psi):
+    # compute antenna factors Fplus and Fcross
+    fp = 0.5 * (1 + np.cos(theta) ** 2) * np.cos(2 * phi) * np.cos(2 * psi)
+    fp -= np.cos(theta) * np.sin(2 * phi) * np.sin(2 * psi)
+    fc = 0.5 * (1 + np.cos(theta) ** 2) * np.cos(2 * phi) * np.sin(2 * psi)
+    fc += np.cos(theta) * np.sin(2 * phi) * np.cos(2 * psi)
+    return fp, fc
+
 def project_hplus_hcross(hplus, hcross, theta, phi, psi):
     # compute antenna factors Fplus and Fcross
-    Fp = 0.5*(1 + np.cos(theta)**2)*np.cos(2*phi)*np.cos(2*psi)
-    Fp -= np.cos(theta)*np.sin(2*phi)*np.sin(2*psi)
-    Fc = 0.5*(1 + np.cos(theta)**2)*np.cos(2*phi)*np.sin(2*psi)
-    Fc += np.cos(theta)*np.sin(2*phi)*np.cos(2*psi)
+    fp, fc = compute_fplus_fcross(theta, phi, psi)
 
     # form strain signal in detector
-    hplus.data.data = Fp*hplus.data.data + Fc*hcross.data.data
+    hplus.data.data = fp * hplus.data.data + fc * hcross.data.data
 
     return hplus
 
@@ -1333,6 +1338,36 @@ class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
         )
 
         return value
+
+    def brute_comp_match(self, other, df, workspace_cache, num_comps=None, **kwargs):
+
+        if num_comps is None:
+            num_comps = self.num_comps
+
+        if (num_comps < 1) or (num_comps > 5):
+            raise ValueError("num_comps must be between 1 and 5")
+
+        # Template generates hp and hc
+        h1, h2, h3, h4, h5 = self.get_whitened_normalized_comps(df, **kwargs)
+
+        # Proposal generates h(t), sky loc is later discarded.
+        try:
+            proposal = other.get_whitened_normalized_comps(df, **kwargs)
+        except RuntimeError:
+            # Waveform generation failed. Bad, but try to carry on
+            return 1
+
+        values = np.zeros(5, dtype=np.float32)
+        for i in range(5):
+            # maximize over sky position of template
+            values[i] = SBankComputeFiveCompMatch(
+                h1, h2, h3, h4, h5,
+                proposal[i], num_comps, workspace_cache[0],
+                workspace_cache[1], workspace_cache[2],
+                workspace_cache[3], workspace_cache[4]
+            )
+
+        return values
 
     @classmethod
     def from_sim(cls, sim, bank):

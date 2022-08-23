@@ -309,9 +309,79 @@ class Bank(object):
 
 class BankTHA(Bank):
 
+    def get_factors(self, size):
+        ra = np.random.uniform(0., 2. * np.pi, size=size)
+        dec = np.arccos(np.random.uniform(-1., 1., size=size)) - np.pi / 2.
+        psi = np.random.uniform(0., 2. * np.pi, size=size)
+
+        phi = np.random.uniform(0., 2. * np.pi, size=size)
+        alpha = np.random.uniform(0., 2. * np.pi, size=size)
+        theta = np.arccos(np.random.uniform(-1., 1., size=size))
+
+        fp = 0.5 * (1 + np.cos(ra) ** 2) * np.cos(2 * dec) * np.cos(2 * psi)
+        fp -= np.cos(ra) * np.sin(2 * dec) * np.sin(2 * psi)
+        fc = 0.5 * (1 + np.cos(ra) ** 2) * np.cos(2 * dec) * np.sin(2 * psi)
+        fc += np.cos(ra) * np.sin(2 * dec) * np.cos(2 * psi)
+        
+        aplus = [(1. + np.cos(theta) ** 2.) / 2.]
+        across = [np.cos(theta)]
+
+        aplus += [2. * np.sin(theta) * np.cos(theta)]
+        across += [2 * np.sin(theta)]
+
+        aplus += [3. * np.sin(theta) ** 2.]
+        across += [np.zeros(aplus[-1].shape, dtype=aplus[-1].dtype)]
+
+        aplus += [- aplus[1]]
+        across += [across[1]]
+
+        aplus += [aplus[0]]
+        across += [- across[0]]
+
+        aplus = np.stack(aplus, axis=1)
+        across = np.stack(across, axis=1)
+
+        phik = np.stack([2. * phi + (2. - k) * alpha for k in range(5)], axis=1)
+        psi2 = 2. * psi[:, None]
+
+        a1 = aplus * np.cos(phik) * np.cos(psi2) - across * np.sin(phik) * np.sin(psi2)
+        a2 = aplus * np.cos(phik) * np.sin(psi2) + across * np.sin(phik) * np.cos(psi2)
+        a3 = - aplus * np.sin(phik) * np.cos(psi2) - across * np.cos(phik) * np.sin(psi2)
+        a4 = - aplus * np.sin(phik) * np.sin(psi2) + across * np.cos(phik) * np.cos(psi2)
+
+        wp = fp * np.cos(2. * psi) - fc * np.sin(2. * psi)
+        wc = fp * np.sin(2. * psi) + fc * np.cos(2. * psi)
+
+        wp = wp[:, None]
+        wc = wc[:, None]
+
+        real = wp * a1 + wc * a2
+        imag = wp * a3 + wc * a4
+
+        return (real ** 2. + imag ** 2.) ** 0.5
+
+    def _skyaverage_match(self, tmplt, proposal, f, **kwargs):
+        matches = tmplt.brute_comp_match(proposal, f, self._workspace_cache, **kwargs)
+        if not self.cache_waveforms:
+            tmplt.clear()
+
+        num_comps = kwargs.get("num_comps", 5)
+
+        b = np.tan(tmplt.beta / 2.)
+        bk = b ** np.arange(5)
+        bk = bk / ((1 + b ** 2.) ** 2.)
+        sigmasq = (self.factors * bk[None, :]) ** 2.
+
+        opts = np.sum(sigmasq, axis=1)
+        amps = np.sum((matches[None, :] ** 2.) * sigmasq, axis=1)
+
+        match = (np.sum(amps ** (3. / 2.)) / np.sum(opts ** (3. / 2.))) ** (1. / 3.)
+        return match
+
     def __init__(self, noise_model, flow, cache_waveforms=False, nhood_size=1.0,
                  nhood_param="tau0", coarse_match_df=None, iterative_match_df_max=None,
-                 fhigh_max=None, optimize_flow=None, flow_column=None, max_num_comps=5):
+                 fhigh_max=None, optimize_flow=None, flow_column=None, max_num_comps=5,
+                 sky_draws=1000):
 
         super(BankTHA, self).__init__(
             noise_model, flow,
@@ -331,6 +401,9 @@ class BankTHA(Bank):
                                  SBankWorkspaceCache()]
         self.max_num_comps = max_num_comps
 
+        self.sky_draws = sky_draws
+        self.factors = self.get_factors(sky_draws)
+        self.compute_match = self._skyaverage_match
 
     def insort_idx(self, new):
         ind = bisect.bisect_left(self._nhoods, getattr(new, self.nhood_param))
