@@ -547,52 +547,45 @@ for tmplt in proposal:
     nprop += 1 # total throughout lifetime of process
 
     #
-    # check if proposal is already covered by existing templates
+    # check if proposal is covered by an existing template
     #
-    matches, templates = bank.covers(tmplt, opts.match_min, return_full=True)
-    if (matches[0] < opts.match_min):
+    bmatch, btemplate = bank.covers(tmplt, opts.match_min)
+    if bmatch < opts.match_min:
 
-        # Set the proposal's num_comps to 0, this will only effect the
-        # generation of the harmonics, and means that all values of num_comps
-        # will be tested.
-        # Do not do this for trial waveforms, we assume they already have an
-        # appropriate number of harmonics selected. (take 1 away from their
-        # num_comps so the current num_comps will be tested)
-        if not opts.trial_waveforms:
-            tmplt.num_comps = 0
-        else:
-            tmplt.num_comps -= 1
-
-        if templates[0] is None:
-            nhood = [tmplt]
-        else:
-            nhood = [tmplt] + templates
-
-        match, matcher, num_comps = bank.covers_harmonics(tmplt, opts.match_min,
-                                                          nhood=nhood,
-                                                          skip_current=True)
-
-        if match < opts.match_min:
-            print("Warning: match should be > opts.match_min after this step!")
-
-        # set the num_comps of the template to be the minimum number to
-        # cover the proposal
-        matcher.num_comps = num_comps
-
-        # check if the best matching template and proposal are the same
-        # if so add the proposal to the bank
-        if tmplt is matcher:
+        # If it is a trial waveform assume that the right number of harmonics
+        # has already been picked and add it as is.
+        if opts.trial_waveforms:
             bank.insort(tmplt)
             log_string = "added"
         else:
-            log_string = "modified"
+            for i in range(opts.max_num_comps):
+                # Find the best match for num_comps=i
+                # set min_match to 2. so it tests the full bank
+                match, template = bank.covers_harmonics(
+                    tmplt, 2., num_comps=i+1,
+                    less_only=True, include_proposal=True
+                )
+                if match > opts.match_min:
+                    template.num_comps = i + 1
+                    break
+
+            if match < opts.match_min:
+                print("Warning: match should be > opts.match_min after this step!")
+
+            # check if the best matching template and proposal are the same
+            # if so add the proposal to the bank
+            if tmplt is template:
+                bank.insort(tmplt)
+                log_string = "added"
+            else:
+                log_string = "modified"
         
         ks.append(k)
         if opts.verbose:
-            print("\nbank size: %d\t\tproposed: %d\trejection rate: %.6f / (%.6f)" % (len(bank), nprop, 1 - float(len(ks))/float(sum(ks)), 1 - 1./opts.convergence_threshold ))
+            print(f"\nbank size: {len(bank)}\tproposed: {nprop}\trejection rate: {1 - float(len(ks)) / float(sum(ks)):.6f} / ({1 - 1. / opts.convergence_threshold:.6f})")
             print("proposal:\t\t", tmplt)
-            print("max match (%.4f):\t" % matches[0], templates[0])
-            print("{0} ({1:.4f}): \t".format(log_string, match), matcher)
+            print(f"max match ({bmatch:.4f}):\t", btemplate)
+            print(f"{log_string} ({match:.4f}): \t", template)
         k = 0
 
         # Since num_comps can be updated for existing teplates we must save

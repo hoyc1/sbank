@@ -29,7 +29,7 @@ from lal import CreateREAL8Vector, CreateCOMPLEX8FrequencySeries
 from ligo.lw.lsctables import SnglInspiralTable as llwsit
 
 from .overlap import SBankComputeMatchSkyLoc, SBankComputeMatch
-from .overlap import SBankComputeFiveCompMatch
+from .overlap import SBankComputeFiveCompMatch, SBankComputeFiveCompFactorMatch
 from .psds import get_neighborhood_PSD, get_ASD
 from .tau0tau3 import m1m2_to_tau0tau3
 
@@ -1224,7 +1224,6 @@ class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
             arr_view_h5[:int(self.flow / df)] = 0.
             arr_view_h5[int(self.f_final/df):h5.data.length] = 0.
 
-
             # Get normalization factors and normalize
             self._h1sigmasq[df] = compute_sigmasq(arr_view_h1, df)
             self._h2sigmasq[df] = compute_sigmasq(arr_view_h2, df)
@@ -1246,6 +1245,7 @@ class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
                 (arr_view_h2[:] - h1h2corr * arr_view_h1[:])
                 / (1. - h1h2corr * h1h2corr.conj()) ** 0.5
             )
+
             arr_view_h3[:] = (
                 (arr_view_h3[:] - h1h3corr * arr_view_h1[:])
                 / (1. - h1h3corr * h1h3corr.conj()) ** 0.5
@@ -1301,13 +1301,6 @@ class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
             self._wf_h4[df] = FrequencySeries_to_COMPLEX8FrequencySeries(h4)
             self._wf_h5[df] = FrequencySeries_to_COMPLEX8FrequencySeries(h5)
 
-            arr_view_h1 = self._wf_h1[df].data.data
-            arr_view_h2 = self._wf_h2[df].data.data
-            arr_view_h3 = self._wf_h3[df].data.data
-            arr_view_h4 = self._wf_h4[df].data.data
-            arr_view_h5 = self._wf_h5[df].data.data
-            hs = [arr_view_h1, arr_view_h2, arr_view_h3, arr_view_h4, arr_view_h5]
-
         return (self._wf_h1[df], self._wf_h2[df], self._wf_h3[df],
                 self._wf_h4[df], self._wf_h5[df])
 
@@ -1339,7 +1332,7 @@ class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
 
         return value
 
-    def brute_comp_match(self, other, df, workspace_cache, num_comps=None, **kwargs):
+    def brute_comp_match(self, other, factors, df, workspace_cache, num_comps=None, **kwargs):
 
         if num_comps is None:
             num_comps = self.num_comps
@@ -1350,24 +1343,35 @@ class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
         # Template generates hp and hc
         h1, h2, h3, h4, h5 = self.get_whitened_normalized_comps(df, **kwargs)
 
-        # Proposal generates h(t), sky loc is later discarded.
         try:
-            proposal = other.get_whitened_normalized_comps(df, **kwargs)
+            p1, p2, p3, p4, p5 = other.get_whitened_normalized_comps(df, **kwargs)
         except RuntimeError:
             # Waveform generation failed. Bad, but try to carry on
             return 1
 
-        values = np.zeros(5, dtype=np.float32)
-        for i in range(5):
-            # maximize over sky position of template
-            values[i] = SBankComputeFiveCompMatch(
-                h1, h2, h3, h4, h5,
-                proposal[i], num_comps, workspace_cache[0],
-                workspace_cache[1], workspace_cache[2],
-                workspace_cache[3], workspace_cache[4]
-            )
+        # maximize over sky position of template
+        value = SBankComputeFiveCompFactorMatch(
+            h1, h2, h3, h4, h5,
+            p1, p2, p3, p4, p5,
+            factors[0], factors[1],
+            factors[2], factors[3],
+            factors[4], num_comps,
+            workspace_cache[0], workspace_cache[1],
+            workspace_cache[2], workspace_cache[3],
+            workspace_cache[4], workspace_cache[5],
+            workspace_cache[6], workspace_cache[7],
+            workspace_cache[8], workspace_cache[9],
+            workspace_cache[10], workspace_cache[11],
+            workspace_cache[12], workspace_cache[13],
+            workspace_cache[14], workspace_cache[15],
+            workspace_cache[16], workspace_cache[17],
+            workspace_cache[18], workspace_cache[19],
+            workspace_cache[20], workspace_cache[21],
+            workspace_cache[22], workspace_cache[23],
+            workspace_cache[24]
+        )
 
-        return values
+        return value
 
     @classmethod
     def from_sim(cls, sim, bank):

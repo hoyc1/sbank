@@ -25,6 +25,7 @@ from six.moves import range
 import numpy as np
 
 from lal.iterutils import inorder, uniq
+from lal import CreateREAL8Vector
 from .overlap import SBankWorkspaceCache
 from .psds import get_neighborhood_ASD, get_PSD, get_neighborhood_df_fmax
 from . import waveforms
@@ -361,27 +362,26 @@ class BankTHA(Bank):
         return (real ** 2. + imag ** 2.) ** 0.5
 
     def _skyaverage_match(self, tmplt, proposal, f, **kwargs):
-        matches = tmplt.brute_comp_match(proposal, f, self._workspace_cache, **kwargs)
-        if not self.cache_waveforms:
-            tmplt.clear()
-
-        num_comps = kwargs.get("num_comps", 5)
-
         b = np.tan(tmplt.beta / 2.)
         bk = b ** np.arange(5)
         bk = bk / ((1 + b ** 2.) ** 2.)
-        sigmasq = (self.factors * bk[None, :]) ** 2.
+        factors = self.factors * bk[None, :]
 
-        opts = np.sum(sigmasq, axis=1)
-        amps = np.sum((matches[None, :] ** 2.) * sigmasq, axis=1)
+        for i in range(5):
+            self.tmp_factors[i].data[:] = factors[:, i]
 
-        match = (np.sum(amps ** (3. / 2.)) / np.sum(opts ** (3. / 2.))) ** (1. / 3.)
+        match = tmplt.brute_comp_match(
+            proposal, self.tmp_factors, f, self._workspace_cache, **kwargs
+        )
+        if not self.cache_waveforms:
+            tmplt.clear()
+
         return match
 
     def __init__(self, noise_model, flow, cache_waveforms=False, nhood_size=1.0,
                  nhood_param="tau0", coarse_match_df=None, iterative_match_df_max=None,
                  fhigh_max=None, optimize_flow=None, flow_column=None, max_num_comps=5,
-                 sky_draws=1000):
+                 sky_draws=10000):
 
         super(BankTHA, self).__init__(
             noise_model, flow,
@@ -393,16 +393,13 @@ class BankTHA(Bank):
             optimize_flow=optimize_flow, flow_column=flow_column,
         )
 
-        # We need 5 caches for harmonic banks
-        self._workspace_cache = [SBankWorkspaceCache(),
-                                 SBankWorkspaceCache(),
-                                 SBankWorkspaceCache(),
-                                 SBankWorkspaceCache(),
-                                 SBankWorkspaceCache()]
+        # We need 25 caches for harmonic banks
+        self._workspace_cache = [SBankWorkspaceCache() for i in range(25)]
         self.max_num_comps = max_num_comps
 
         self.sky_draws = sky_draws
         self.factors = self.get_factors(sky_draws)
+        self.tmp_factors = [CreateREAL8Vector(sky_draws) for i in range(5)]
         self.compute_match = self._skyaverage_match
 
     def insort_idx(self, new):
@@ -428,7 +425,8 @@ class BankTHA(Bank):
         self._templates.extend(newtmplts)
         self._templates.sort(key=attrgetter(self.nhood_param))
 
-    def covers(self, proposal, min_match, nhood=None, return_full=False, **kwargs):
+    def covers_harmonics(self, proposal, min_match, nhood=None, num_comps=5,
+                         less_only=False, include_proposal=False, **kwargs):
         """
         Return (max_match, template) where max_match is either (i) the
         best found match if max_match < min_match or (ii) the match of
@@ -446,12 +444,13 @@ class BankTHA(Bank):
             tmpbank = self._templates[low:high]
         else:
             tmpbank = nhood
+
+        if include_proposal:
+            tmpbank += [proposal]
+
         if not tmpbank:
             #print ("None in neighborhood")
-            if return_full:
-                return [max_match], [template]
-            else:
-                return max_match, template
+            return max_match, template
 
         # sort the bank by its nearness to tmplt in mchirp
         # NB: This sort comes up as a dominating cost if you profile,
@@ -472,14 +471,13 @@ class BankTHA(Bank):
         # Stop if the match is too low
         rough_match = min_match - 0.05
 
-        # store the matches so they can be ordered
-        matches = []
-
         # find and test matches
         for tmplt in tmpbank:
 
+            if less_only and tmplt.num_comps < num_comps:
+                continue
+
             self._nmatch += 1
-            num_comps = min(tmplt.num_comps, self.max_num_comps)
 
             if self.coarse_match_df:
                 # Perform a match at high df to see if point can be quickly
@@ -488,114 +486,20 @@ class BankTHA(Bank):
                                           num_comps=num_comps, **kwargs)
 
                 if (match > 0) and (match < rough_match):
-                    matches += [match]
                     continue
 
             match = self.tmplt_df_iter(tmplt, proposal, df_start, df_end, f_max,
-                                       min_match=rough_match, num_comps=num_comps,
-                                       **kwargs)
-            matches += [match]
+                                       min_match=rough_match, num_comps=num_comps, **kwargs)
+
+            if match > min_match:
+                return match, tmplt
 
             # record match and template params for highest match
             if match > max_match:
                 max_match = match
                 template = tmplt
 
-            if match > min_match:
-                #print ("Rejecting at", match)
-                break
-
-        if return_full:
-            idxs = np.argsort(matches)[::-1]
-            max_match = [matches[idx] for idx in idxs]
-            template = [tmpbank[idx] for idx in idxs]
-
         return max_match, template
-
-    def covers_harmonics(self, proposal, min_match, nhood=None, skip_current=False, **kwargs):
-        """
-        Return (max_match, template) where max_match is either (i) the
-        best found match if max_match < min_match or (ii) the match of
-        the first template found with match >= min_match.  template is
-        the Template() object which yields max_match.
-        """
-        max_match = 0
-        template = None
-        num_comps = 0
-
-        # find templates in the bank "near" this tmplt
-        prop_nhd = getattr(proposal, self.nhood_param)
-        if not nhood:
-            low, high = _find_neighborhood(self._nhoods, prop_nhd,
-                                           self.nhood_size)
-            tmpbank = self._templates[low:high]
-        else:
-            tmpbank = nhood
-        if not tmpbank:
-            #print ("None in neighborhood")
-            return max_match, template, num_comps
-
-        # sort the bank by its nearness to tmplt in mchirp
-        # NB: This sort comes up as a dominating cost if you profile,
-        # but it cuts the number of match evaluations by 80%, so turns out
-        # to be worth it even for metric match, where matches are cheap.
-        tmpbank.sort(key=lambda b: abs(getattr(b, self.nhood_param) - prop_nhd))
-
-        # set parameters of match calculation that are optimized for this block
-        df_end, f_max = get_neighborhood_df_fmax(tmpbank + [proposal],
-                                                 self.flow)
-        if self.fhigh_max:
-            f_max = min(f_max, self.fhigh_max)
-        if self.iterative_match_df_max is not None:
-            df_start = max(df_end, self.iterative_match_df_max)
-        else:
-            df_start = df_end
-
-        # Stop if the match is too low
-        rough_match = min_match - 0.05
-
-        # if skip current then do not test the current value of num_comps
-        # for each template
-        if skip_current:
-            check_mod = 1
-        else:
-            check_mod = 0
-
-        # iterate through the number of harmonics to test templates with
-        # fewer harmonics first
-        for i in range(1, self.max_num_comps + 1):
-
-            # find and test matches
-            for tmplt in tmpbank:
-
-                if tmplt.num_comps > (i - check_mod):
-                    continue
-
-                self._nmatch += 1
-
-                if self.coarse_match_df:
-                    # Perform a match at high df to see if point can be quickly
-                    # ruled out as already covering the proposal
-                    match = self.tmplt_coarse(tmplt, proposal, f_max,
-                                              num_comps=i, **kwargs)
-
-                    if (match > 0) and (match < rough_match):
-                        continue
-
-                match = self.tmplt_df_iter(tmplt, proposal, df_start, df_end, f_max,
-                                           min_match=rough_match, num_comps=i, **kwargs)
-
-                if match > min_match:
-                    #print ("Rejecting at", match)
-                    return match, tmplt, i
-
-                # record match and template params for highest match
-                if match > max_match:
-                    max_match = match
-                    template = tmplt
-                    num_comps = i
-
-        return max_match, template, num_comps
 
     def clear(self):
         if hasattr(self, "_workspace_cache"):
