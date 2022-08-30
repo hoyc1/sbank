@@ -5,6 +5,7 @@
 # to use the GPU if needed (although it will likely be more complicated than
 # that if the waveforms were not generated on the GPU)
 
+import numpy as np
 from .overlap_cpu import SBankCythonComputeMatch
 from .overlap_cpu import SBankCythonComputeRealMatch
 from .overlap_cpu import SBankCythonComputeMatchMaxSkyLoc
@@ -100,7 +101,9 @@ def SBankComputeFiveCompMatch(h1, h2, h3, h4, h5, proposal, num_comps, workspace
 
 def SBankComputeFiveCompFactorMatch(h1, h2, h3, h4, h5,
                                     p1, p2, p3, p4, p5,
-                                    f1, f2, f3, f4, f5,
+                                    sigmasq1, sigmasq2, sigmasq3,
+                                    sigmasq4, sigmasq5,
+                                    sigmasq, matchsq,
                                     num_comps, workspace_cache1,
                                     workspace_cache2, workspace_cache3,
                                     workspace_cache4, workspace_cache5,
@@ -135,20 +138,27 @@ def SBankComputeFiveCompFactorMatch(h1, h2, h3, h4, h5,
     assert(p3.data.length == p1.data.length)
     assert(p4.data.length == p1.data.length)
     assert(p5.data.length == p1.data.length)
+    assert(sigmasq1.length == sigmasq.length)
+    assert(sigmasq2.length == sigmasq.length)
+    assert(sigmasq3.length == sigmasq.length)
+    assert(sigmasq4.length == sigmasq.length)
+    assert(sigmasq5.length == sigmasq.length)
+    assert(matchsq.length == sigmasq.length)
+
     if p1.data.length <= h1.data.length:
         min_len = p1.data.length
     else:
         min_len = h1.data.length
-    f_len = f1.length
+    f_len = sigmasq.length
 
     return SBankCythonComputeFiveCompFactorMatch(h1.data.data, h2.data.data,
                                                  h3.data.data, h4.data.data,
                                                  h5.data.data, p1.data.data,
                                                  p2.data.data, p3.data.data,
                                                  p4.data.data, p5.data.data,
-                                                 f1.data, f2.data, f3.data,
-                                                 f4.data, f5.data,
-                                                 min_len, f_len,
+                                                 sigmasq1.data, sigmasq2.data, sigmasq3.data,
+                                                 sigmasq4.data, sigmasq5.data, sigmasq.data,
+                                                 matchsq.data, min_len, f_len,
                                                  h1.deltaF, num_comps,
                                                  workspace_cache1, workspace_cache2,
                                                  workspace_cache3, workspace_cache4,

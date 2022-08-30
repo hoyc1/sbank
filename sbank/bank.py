@@ -310,7 +310,7 @@ class Bank(object):
 
 class BankTHA(Bank):
 
-    def get_factors(self, size):
+    def get_comp_sigmasqs(self, size):
         ra = np.random.uniform(0., 2. * np.pi, size=size)
         dec = np.arccos(np.random.uniform(-1., 1., size=size)) - np.pi / 2.
         psi = np.random.uniform(0., 2. * np.pi, size=size)
@@ -359,19 +359,22 @@ class BankTHA(Bank):
         real = wp * a1 + wc * a2
         imag = wp * a3 + wc * a4
 
-        return (real ** 2. + imag ** 2.) ** 0.5
+        return real ** 2. + imag ** 2.
 
     def _skyaverage_match(self, tmplt, proposal, f, **kwargs):
         b = np.tan(tmplt.beta / 2.)
         bk = b ** np.arange(5)
         bk = bk / ((1 + b ** 2.) ** 2.)
-        factors = self.factors * bk[None, :]
+        comp_sigmasq = self.factors * (bk[None, :] ** 2.)
 
+        self.sigmasq.data[:] = np.sum(comp_sigmasq, axis=1)
+        self.matchsq.data[:] *= 0.
         for i in range(5):
-            self.tmp_factors[i].data[:] = factors[:, i]
+            self.comp_sigmasq[i].data[:] = comp_sigmasq[:, i]
 
         match = tmplt.brute_comp_match(
-            proposal, self.tmp_factors, f, self._workspace_cache, **kwargs
+            proposal, self.comp_sigmasq, self.sigmasq, self.matchsq, f,
+            self._workspace_cache, **kwargs
         )
         if not self.cache_waveforms:
             tmplt.clear()
@@ -381,7 +384,7 @@ class BankTHA(Bank):
     def __init__(self, noise_model, flow, cache_waveforms=False, nhood_size=1.0,
                  nhood_param="tau0", coarse_match_df=None, iterative_match_df_max=None,
                  fhigh_max=None, optimize_flow=None, flow_column=None, max_num_comps=5,
-                 sky_draws=10000):
+                 sky_draws=1000):
 
         super(BankTHA, self).__init__(
             noise_model, flow,
@@ -398,8 +401,10 @@ class BankTHA(Bank):
         self.max_num_comps = max_num_comps
 
         self.sky_draws = sky_draws
-        self.factors = self.get_factors(sky_draws)
-        self.tmp_factors = [CreateREAL8Vector(sky_draws) for i in range(5)]
+        self.factors = self.get_comp_sigmasqs(sky_draws)
+        self.comp_sigmasq = [CreateREAL8Vector(sky_draws) for i in range(5)]
+        self.sigmasq = CreateREAL8Vector(sky_draws)
+        self.matchsq = CreateREAL8Vector(sky_draws)
         self.compute_match = self._skyaverage_match
 
     def insort_idx(self, new):

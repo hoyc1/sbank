@@ -71,9 +71,10 @@ double _SBankComputeFiveCompFactorMatch(complex *temp_comp1, complex *temp_comp2
 					complex *temp_comp5, complex *prop_comp1,
 					complex *prop_comp2, complex *prop_comp3,
 					complex *prop_comp4, complex *prop_comp5,
-					double *prop_factor1, double *prop_factor2,
-					double *prop_factor3, double *prop_factor4,
-					double *prop_factor5, size_t min_len,
+					double *sigmasq1, double *sigmasq2,
+					double *sigmasq3, double *sigmasq4,
+					double *sigmasq5, double *sigmasq,
+					double *matchsq, size_t min_len,
 					size_t f_len, double delta_f, int8_t num_comps,
 					WS *workspace_cache1,
 					WS *workspace_cache2, WS *workspace_cache3,
@@ -521,10 +522,12 @@ double _SBankComputeFiveCompFactorMatch(complex *temp_comp1, complex *temp_comp2
 					complex *temp_comp5, complex *prop_comp1,
 					complex *prop_comp2, complex *prop_comp3,
 					complex *prop_comp4, complex *prop_comp5,
-					double *prop_factor1, double *prop_factor2,
-					double *prop_factor3, double *prop_factor4,
-					double *prop_factor5, size_t min_len,
-					size_t f_len, double delta_f, int8_t num_comps,
+					double *sigmasq1, double *sigmasq2,
+					double *sigmasq3, double *sigmasq4,
+					double *sigmasq5, double *sigmasq,
+					double *matchsq,
+					size_t min_len, size_t f_len,
+					double delta_f, int8_t num_comps,
 					WS *workspace_cache1,
 					WS *workspace_cache2, WS *workspace_cache3,
 					WS *workspace_cache4, WS *workspace_cache5,
@@ -757,65 +760,126 @@ double _SBankComputeFiveCompFactorMatch(complex *temp_comp1, complex *temp_comp2
     float complex *zdata24 = ws24->zt->data;
     float complex *zdata25 = ws25->zt->data;
 
+    double matchsq1;
+    double matchsq2;
+    double matchsq3;
+    double matchsq4;
+    double matchsq5;
+    double matchsq6;
+    double matchsq7;
+    double matchsq8;
+    double matchsq9;
+    double matchsq10;
+    double matchsq11;
+    double matchsq12;
+    double matchsq13;
+    double matchsq14;
+    double matchsq15;
+    double matchsq16;
+    double matchsq17;
+    double matchsq18;
+    double matchsq19;
+    double matchsq20;
+    double matchsq21;
+    double matchsq22;
+    double matchsq23;
+    double matchsq24;
+    double matchsq25;
+
+    double temp1;
+    double temp2;
+    double temp3;
+    double temp4;
+    double temp5;
+
+    double temp;
+    double matchsqk;
+
+    size_t k = n;
+    for (;k--;) {
+        matchsq1 = abs2(zdata1[k]);
+	matchsq2 = abs2(zdata2[k]);
+	matchsq3 = abs2(zdata3[k]);
+	matchsq4 = abs2(zdata4[k]);
+	matchsq5 = abs2(zdata5[k]);
+	if (num_comps > 1) {
+	    matchsq6 = abs2(zdata6[k]);
+	    matchsq7 = abs2(zdata7[k]);
+	    matchsq8 = abs2(zdata8[k]);
+	    matchsq9 = abs2(zdata9[k]);
+	    matchsq10 = abs2(zdata10[k]);
+	}
+	if (num_comps > 2) {
+	    matchsq11 = abs2(zdata11[k]);
+	    matchsq12 = abs2(zdata12[k]);
+	    matchsq13 = abs2(zdata13[k]);
+	    matchsq14 = abs2(zdata14[k]);
+	    matchsq15 = abs2(zdata15[k]);
+	}
+	if (num_comps > 3) {
+	    matchsq16 = abs2(zdata16[k]);
+	    matchsq17 = abs2(zdata17[k]);
+	    matchsq18 = abs2(zdata18[k]);
+	    matchsq19 = abs2(zdata19[k]);
+	    matchsq20 = abs2(zdata20[k]);
+	}
+	if (num_comps > 4) {
+	    matchsq21 = abs2(zdata21[k]);
+	    matchsq22 = abs2(zdata22[k]);
+	    matchsq23 = abs2(zdata23[k]);
+	    matchsq24 = abs2(zdata24[k]);
+	    matchsq25 = abs2(zdata25[k]);
+	}
+	if (num_comps == 1) {
+	    temp1 = matchsq1;
+	    temp2 = matchsq2;
+	    temp3 = matchsq3;
+	    temp4 = matchsq4;
+	    temp5 = matchsq5;
+	} else if (num_comps == 2) {
+	    temp1 = (matchsq1 + matchsq6);
+	    temp2 = (matchsq2 + matchsq7);
+	    temp3 = (matchsq3 + matchsq8);
+	    temp4 = (matchsq4 + matchsq9);
+	    temp5 = (matchsq5 + matchsq10);
+	} else if (num_comps == 3) {
+	    temp1 = (matchsq1 + matchsq6 + matchsq11);
+	    temp2 = (matchsq2 + matchsq7 + matchsq12);
+	    temp3 = (matchsq3 + matchsq8 + matchsq13);
+	    temp4 = (matchsq4 + matchsq9 + matchsq14);
+	    temp5 = (matchsq5 + matchsq10 + matchsq15);
+	} else if (num_comps == 4) {
+	    temp1 = (matchsq1 + matchsq6 + matchsq11 + matchsq16);
+	    temp2 = (matchsq2 + matchsq7 + matchsq12 + matchsq17);
+	    temp3 = (matchsq3 + matchsq8 + matchsq13 + matchsq18);
+	    temp4 = (matchsq4 + matchsq9 + matchsq14 + matchsq19);
+	    temp5 = (matchsq5 + matchsq10 + matchsq15 + matchsq20);
+	} else if (num_comps == 5) {
+	    temp1 = (matchsq1 + matchsq6 + matchsq11 + matchsq16 + matchsq21);
+	    temp2 = (matchsq2 + matchsq7 + matchsq12 + matchsq17 + matchsq22);
+	    temp3 = (matchsq3 + matchsq8 + matchsq13 + matchsq18 + matchsq23);
+	    temp4 = (matchsq4 + matchsq9 + matchsq14 + matchsq19 + matchsq24);
+	    temp5 = (matchsq5 + matchsq10 + matchsq15 + matchsq20 + matchsq25);
+	}
+	size_t l = f_len;
+	for (;l--;) {
+	    temp = temp1 * sigmasq1[l] + temp2 * sigmasq2[l] + temp3 * sigmasq3[l] + temp4 * sigmasq4[l] + temp5 * sigmasq5[l];
+	    matchsqk = temp / sigmasq[l];
+	    if (matchsqk > matchsq[l]) {
+	        matchsq[l] = matchsqk;
+	    }
+	}
+    }
+    
     double top = 0.;
     double bot = 0.;
-    size_t l = f_len;
-    for (;l--;) {
-        double max_temp = 0.;
-        double max_match = 0.;
-        double amp1 = prop_factor1[l] * prop_factor1[l];
-        double amp2 = prop_factor2[l] * prop_factor2[l];
-        double amp3 = prop_factor3[l] * prop_factor3[l];
-        double amp4 = prop_factor4[l] * prop_factor4[l];
-        double amp5 = prop_factor5[l] * prop_factor5[l];
-	double amp = amp1 + amp2 + amp3 + amp4 + amp5;
-	size_t k = n;
-	for (;k--;) {
-	    double temp = 0.;
-	    double match = 0.;
-	    temp += abs2(zdata1[k]) * amp1;
-	    temp += abs2(zdata2[k]) * amp2;
-	    temp += abs2(zdata3[k]) * amp3;
-	    temp += abs2(zdata4[k]) * amp4;
-	    temp += abs2(zdata5[k]) * amp5;
-	    if (num_comps > 1) {
-		temp += abs2(zdata6[k]) * amp1;
-		temp += abs2(zdata7[k]) * amp2;
-		temp += abs2(zdata8[k]) * amp3;
-		temp += abs2(zdata9[k]) * amp4;
-		temp += abs2(zdata10[k]) * amp5;
-	    }
-	    if (num_comps > 2) {
-		temp += abs2(zdata11[k]) * amp1;
-		temp += abs2(zdata12[k]) * amp2;
-		temp += abs2(zdata13[k]) * amp3;
-		temp += abs2(zdata14[k]) * amp4;
-		temp += abs2(zdata15[k]) * amp5;
-	    }
-	    if (num_comps > 3) {
-		temp += abs2(zdata16[k]) * amp1;
-		temp += abs2(zdata17[k]) * amp2;
-		temp += abs2(zdata18[k]) * amp3;
-		temp += abs2(zdata19[k]) * amp4;
-		temp += abs2(zdata20[k]) * amp5;
-	    }
-	    if (num_comps > 4) {
-		temp += abs2(zdata21[k]) * amp1;
-		temp += abs2(zdata22[k]) * amp2;
-		temp += abs2(zdata23[k]) * amp3;
-		temp += abs2(zdata24[k]) * amp4;
-		temp += abs2(zdata25[k]) * amp5;
-	    }
-	    match = temp / amp;
-	    if (match > max_match) {
-	        max_temp = temp;
-	        max_match = match;
-	    }
-
-	}
-	top += pow(max_temp, 1.5);
-	bot += pow(amp, 1.5);
+    size_t m = f_len;
+    for (;m--;){
+        double amp = matchsq[m] * sigmasq[m];
+        top += pow(amp, 1.5);
+	bot += pow(sigmasq[m], 1.5);
     }
+
     double result;
     result = 4. * delta_f * pow(top / bot, 1./3.);
     return result;

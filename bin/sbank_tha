@@ -224,6 +224,7 @@ def parse_command_line():
     parser.add_option("--mchirp-max", help="Deprecated. Set maximum chirp-mass of the system (in solar masses)", type="float")
 
     parser.add_option("--max-num-comps", type="int", default=5, help="Maximum number of harmonics to be used.")
+    parser.add_option("--sky-draws", type="int", default=1000, help="Number of sky positions/orientiations to draw.")
 
     opts, args = parser.parse_args()
 
@@ -378,7 +379,7 @@ else:
 #
 # initialize the bank
 #
-bank = BankTHA(noise_model, opts.flow, cache_waveforms=opts.cache_waveforms, nhood_size=opts.neighborhood_size, nhood_param=opts.neighborhood_param, coarse_match_df=opts.coarse_match_df, iterative_match_df_max=opts.iterative_match_df_max, fhigh_max=opts.fhigh_max, optimize_flow=opts.optimize_flow, flow_column=opts.flow_column, max_num_comps=opts.max_num_comps)
+bank = BankTHA(noise_model, opts.flow, cache_waveforms=opts.cache_waveforms, nhood_size=opts.neighborhood_size, nhood_param=opts.neighborhood_param, coarse_match_df=opts.coarse_match_df, iterative_match_df_max=opts.iterative_match_df_max, fhigh_max=opts.fhigh_max, optimize_flow=opts.optimize_flow, flow_column=opts.flow_column, max_num_comps=opts.max_num_comps, sky_draws=opts.sky_draws)
 
 #
 # check for saved work
@@ -557,6 +558,9 @@ for tmplt in proposal:
         if opts.trial_waveforms:
             bank.insort(tmplt)
             log_string = "added"
+            # Need to set this to something in case --verbose is used
+            match = 1.
+            template = tmplt
         else:
             for i in range(opts.max_num_comps):
                 # Find the best match for num_comps=i

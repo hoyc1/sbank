@@ -1332,7 +1332,8 @@ class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
 
         return value
 
-    def brute_comp_match(self, other, factors, df, workspace_cache, num_comps=None, **kwargs):
+    def brute_comp_match(self, other, comp_sigmasq, sigmasq, matchsq, df, workspace_cache,
+                         num_comps=None, **kwargs):
 
         if num_comps is None:
             num_comps = self.num_comps
@@ -1353,9 +1354,10 @@ class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
         value = SBankComputeFiveCompFactorMatch(
             h1, h2, h3, h4, h5,
             p1, p2, p3, p4, p5,
-            factors[0], factors[1],
-            factors[2], factors[3],
-            factors[4], num_comps,
+            comp_sigmasq[0], comp_sigmasq[1],
+            comp_sigmasq[2], comp_sigmasq[3],
+            comp_sigmasq[4],
+            sigmasq, matchsq, num_comps,
             workspace_cache[0], workspace_cache[1],
             workspace_cache[2], workspace_cache[3],
             workspace_cache[4], workspace_cache[5],

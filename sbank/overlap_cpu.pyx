@@ -12,7 +12,7 @@ cdef extern from "overlap_cpu_lib.c":
     double _SBankComputeMatchMaxSkyLoc(float complex *hp, float complex *hc, const double hphccorr, float complex *proposal, size_t min_len, double delta_f, WS *workspace_cache1, WS *workspace_cache2)
     double _SBankComputeMatchMaxSkyLocNoPhase(float complex *hp, float complex *hc, const double hphccorr, float complex *proposal, size_t min_len, double delta_f, WS *workspace_cache1, WS *workspace_cache2)
     double _SBankComputeFiveCompMatch(float complex *temp_comp1, float complex *temp_comp2, float complex *temp_comp3, float complex *temp_comp4, float complex *temp_comp5, float complex *proposal, size_t min_len, double delta_f, int num_comps, WS *workspace_cache1, WS *workspace_cache2, WS *workspace_cache3, WS *workspace_cache4, WS *workspace_cache5)
-    double _SBankComputeFiveCompFactorMatch(float complex *temp_comp1, float complex *temp_comp2, float complex *temp_comp3, float complex *temp_comp4, float complex *temp_comp5, float complex *prop_comp1, float complex *prop_comp2, float complex *prop_comp3, float complex *prop_comp4, float complex *prop_comp5, double *prop_factor1, double *prop_factor2, double *prop_factor3, double *prop_factor4, double *prop_factor5, size_t min_len, size_t f_len, double delta_f, int num_comps, WS *workspace_cache1, WS *workspace_cache2, WS *workspace_cache3, WS *workspace_cache4, WS *workspace_cache5, WS *workspace_cache6, WS *workspace_cache7, WS *workspace_cache8, WS *workspace_cache9, WS *workspace_cache10, WS *workspace_cache11, WS *workspace_cache12, WS *workspace_cache13, WS *workspace_cache14, WS *workspace_cache15, WS *workspace_cache16, WS *workspace_cache17, WS *workspace_cache18, WS *workspace_cache19, WS *workspace_cache20, WS *workspace_cache21, WS *workspace_cache22, WS *workspace_cache23, WS *workspace_cache24, WS *workspace_cache25)
+    double _SBankComputeFiveCompFactorMatch(float complex *temp_comp1, float complex *temp_comp2, float complex *temp_comp3, float complex *temp_comp4, float complex *temp_comp5, float complex *prop_comp1, float complex *prop_comp2, float complex *prop_comp3, float complex *prop_comp4, float complex *prop_comp5, double *sigmasq1, double *sigmasq2, double *sigmasq3, double *sigmasq4, double *sigmasq5, double *sigmasq, double *matchsq, size_t min_len, size_t f_len, double delta_f, int num_comps, WS *workspace_cache1, WS *workspace_cache2, WS *workspace_cache3, WS *workspace_cache4, WS *workspace_cache5, WS *workspace_cache6, WS *workspace_cache7, WS *workspace_cache8, WS *workspace_cache9, WS *workspace_cache10, WS *workspace_cache11, WS *workspace_cache12, WS *workspace_cache13, WS *workspace_cache14, WS *workspace_cache15, WS *workspace_cache16, WS *workspace_cache17, WS *workspace_cache18, WS *workspace_cache19, WS *workspace_cache20, WS *workspace_cache21, WS *workspace_cache22, WS *workspace_cache23, WS *workspace_cache24, WS *workspace_cache25)
 
 # WARNING: Handling C pointers in python gets nasty. The workspace item is
 #          important for sbank's memory management and optimality. It makes
@@ -152,11 +152,13 @@ def SBankCythonComputeFiveCompFactorMatch(
     numpy.ndarray[numpy.complex64_t, ndim=1, mode="c"] prop_comp3,
     numpy.ndarray[numpy.complex64_t, ndim=1, mode="c"] prop_comp4,
     numpy.ndarray[numpy.complex64_t, ndim=1, mode="c"] prop_comp5,
-    numpy.ndarray[numpy.float64_t, ndim=1, mode="c"] prop_factor1,
-    numpy.ndarray[numpy.float64_t, ndim=1, mode="c"] prop_factor2,
-    numpy.ndarray[numpy.float64_t, ndim=1, mode="c"] prop_factor3,
-    numpy.ndarray[numpy.float64_t, ndim=1, mode="c"] prop_factor4,
-    numpy.ndarray[numpy.float64_t, ndim=1, mode="c"] prop_factor5,
+    numpy.ndarray[numpy.float64_t, ndim=1, mode="c"] sigmasq1,
+    numpy.ndarray[numpy.float64_t, ndim=1, mode="c"] sigmasq2,
+    numpy.ndarray[numpy.float64_t, ndim=1, mode="c"] sigmasq3,
+    numpy.ndarray[numpy.float64_t, ndim=1, mode="c"] sigmasq4,
+    numpy.ndarray[numpy.float64_t, ndim=1, mode="c"] sigmasq5,
+    numpy.ndarray[numpy.float64_t, ndim=1, mode="c"] sigmasq,
+    numpy.ndarray[numpy.float64_t, ndim=1, mode="c"] matchsq,
     int min_len,
     int f_len,
     double delta_f,
@@ -238,4 +240,4 @@ def SBankCythonComputeFiveCompFactorMatch(
     _workspace24 = SBankWorkspaceCache.get_workspace(workspace_cache24)
     _workspace25 = SBankWorkspaceCache.get_workspace(workspace_cache25)
 
-    return _SBankComputeFiveCompFactorMatch(&temp_comp1[0], &temp_comp2[0], &temp_comp3[0], &temp_comp4[0], &temp_comp5[0], &prop_comp1[0], &prop_comp2[0], &prop_comp3[0], &prop_comp4[0], &prop_comp5[0], &prop_factor1[0], &prop_factor2[0], &prop_factor3[0], &prop_factor4[0], &prop_factor5[0], min_len, f_len, delta_f, num_comps, _workspace1, _workspace2, _workspace3, _workspace4, _workspace5, _workspace6, _workspace7, _workspace8, _workspace9, _workspace10, _workspace11, _workspace12, _workspace13, _workspace14, _workspace15, _workspace16, _workspace17, _workspace18, _workspace19, _workspace20, _workspace21, _workspace22, _workspace23, _workspace24, _workspace25)
+    return _SBankComputeFiveCompFactorMatch(&temp_comp1[0], &temp_comp2[0], &temp_comp3[0], &temp_comp4[0], &temp_comp5[0], &prop_comp1[0], &prop_comp2[0], &prop_comp3[0], &prop_comp4[0], &prop_comp5[0], &sigmasq1[0], &sigmasq2[0], &sigmasq3[0], &sigmasq4[0], &sigmasq5[0], &sigmasq[0], &matchsq[0], min_len, f_len, delta_f, num_comps, _workspace1, _workspace2, _workspace3, _workspace4, _workspace5, _workspace6, _workspace7, _workspace8, _workspace9, _workspace10, _workspace11, _workspace12, _workspace13, _workspace14, _workspace15, _workspace16, _workspace17, _workspace18, _workspace19, _workspace20, _workspace21, _workspace22, _workspace23, _workspace24, _workspace25)
