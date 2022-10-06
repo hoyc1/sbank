@@ -1083,12 +1083,13 @@ class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
         self.iota = float(iota)
         self.psi = float(psi)
         self.orb_phase = float(orb_phase)
+        self.fref = self.flow
 
         self.num_comps = int(num_comps)
 
-        outs = lalsim.SimIMRPhenomPCalculateModelParametersFromSourceFrame(
-            self.m1, 
-            self.m2,
+        outs = self._model_parameters_from_source_frame(
+            self.m1*MSUN_SI, 
+            self.m2*MSUN_SI,
             self.flow,
             self.orb_phase,
             self.iota,
@@ -1098,7 +1099,6 @@ class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
             self.spin2x,
             self.spin2y,
             self.spin2z,
-            lalsim.IMRPhenomPv2_V
         )          
         chi1_l, chi2_l, chip, thetaJN, alpha0, phi_aligned, zeta_polariz = outs
 
@@ -1130,35 +1130,40 @@ class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
         self._h4sigmasq = {}
         self._h5sigmasq = {}
 
-    def _compute_waveform_five_comps(self, df, f_final):
-        def gen_phenom_p_comp(thetaJN, alpha0, phi0):
-            return lalsim.SimIMRPhenomP(
-                self.chi1_l,
-                self.chi2_l,
-                self.chip,
-                thetaJN,
-                self.m1*MSUN_SI,
-                self.m2*MSUN_SI,
-                1.e6*PC_SI,
-                alpha0,
-                phi0,
-                df,
-                self.flow,
-                f_final,
-                self.flow,
-                lalsim.IMRPhenomPv2_V,
-                lalsim.NoNRT_V,
-                None
-            )
+    def _model_parameters_from_source_frame(self, *args):
+        return lalsim.SimIMRPhenomPCalculateModelParametersFromSourceFrame(
+            *args, lalsim.IMRPhenomPv2_V
+        )
 
-        hgen1a, _  = gen_phenom_p_comp(0., 0., 0.)
+    def _gen_harmonic_comp(thetaJN, alpha0, phi0):
+        return lalsim.SimIMRPhenomP(
+            self.chi1_l,
+            self.chi2_l,
+            self.chip,
+            thetaJN,
+            self.m1*MSUN_SI,
+            self.m2*MSUN_SI,
+            1.e6*PC_SI,
+            alpha0,
+            phi0,
+            df,
+            self.flow,
+            f_final,
+            self.fref,
+            lalsim.IMRPhenomPv2_V,
+            lalsim.NoNRT_V,
+            None
+        )
+
+    def _compute_waveform_five_comps(self, df, f_final):
+        hgen1a, _  = self._gen_harmonics_comp(0., 0., 0.)
         # hgen1b is negative w.r.t. 1908.05707
-        _, hgen1b = gen_phenom_p_comp(0., 0., np.pi/4.)
+        _, hgen1b = self._gen_harmonics_comp(0., 0., np.pi/4.)
         # These are both negative w.r.t 1908.05707
-        _, hgen2a = gen_phenom_p_comp(np.pi/2., 0., np.pi/4.)
-        _, hgen2b = gen_phenom_p_comp(np.pi/2., np.pi/2., 0.)
-        hgen3a, _ = gen_phenom_p_comp(np.pi/2., 0., 0.)
-        hgen3b, _ = gen_phenom_p_comp(np.pi/2., np.pi/2., 0.)
+        _, hgen2a = self._gen_harmonics_comp(np.pi/2., 0., np.pi/4.)
+        _, hgen2b = self._gen_harmonics_comp(np.pi/2., np.pi/2., 0.)
+        hgen3a, _ = self._gen_harmonics_comp(np.pi/2., 0., 0.)
+        hgen3b, _ = self._gen_harmonics_comp(np.pi/2., np.pi/2., 0.)
 
         # Edit these arrays in place to avoid defining new LAL arrays
         tmp = hgen1a.data.data[:] + hgen1b.data.data[:]
@@ -1450,6 +1455,61 @@ class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
         new_tmplt['orbital_phase'] = self.orb_phase
         new_tmplt['num_comps'] = self.num_comps
         return new_tmplt
+
+
+class IMRPhenomXPTHATemplate(IMRPhenomPv2THATemplate):
+    """
+    """
+    approximant = "IMRPhenomXP"
+
+    def _model_parameters_from_source_frame(self, *args):
+        return lalsim.SimIMRPhenomXPCalculateModelParametersFromSourceFrame(
+            *args
+        )
+
+    def _gen_harmonic_comp(thetaJN, alpha0, phi0):
+        # PhenomXP's generator uses cartesian coordinates not polar. Need to
+        # convert back
+        a1 = np.sqrt(
+            np.sum(
+                np.square([self.spin1x, self.spin1y, self.spin1z])
+            )
+        )
+        a2 = np.sqrt(
+            np.sum(
+                np.square([self.spin2x, self.spin2y, self.spin2z])
+            )
+        )
+        phi1 = np.arctan2(self.spin1y, self.spin1x)
+        phi2 = np.arctan2(self.spin2y, self.spin2x)
+        phi12 = phi2 - phi1
+        if phi12 < 0:
+            phi12 += 2 * np.pi
+        tilt1 = np.arccos(self.spin1z / a1)
+        tilt2 = np.arccos(self.spin2z / a1)
+        iota, spin1x, spin1y, spin1z, spin2x, spin2y, spin2z = \
+            lalsim.SimInspiralTransformPrecessingNewInitialConditions(
+                thetaJN, alpha0, tilt1, tilt2, phi12, a1, a2,
+                self.m1*MSUN_SI, self.m2*MSUN_SI, self.fref, phi0
+            )
+        return lalsim.SimIMRPhenomXPGenerateFD(
+            self.m1*MSUN_SI,
+            self.m2*MSUN_SI,
+            spin1x,
+            spin1y,
+            spin1z,
+            spin2x,
+            spin2y,
+            spin2z,
+            1.e6*PC_SI,
+            iota,
+            phi0,
+            self.flow,
+            f_final,
+            df,
+            self.fref,
+            None
+        )
 
 
 class HigherOrderModeTemplate(PrecessingSpinTemplate):
