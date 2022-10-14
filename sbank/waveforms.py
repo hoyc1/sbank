@@ -1593,6 +1593,7 @@ waveforms = {
     "IMRPhenomPv2": IMRPhenomPv2Template,
     "IMRPhenomPv2_THA": IMRPhenomPv2THATemplate,
     "IMRPhenomPv3": IMRPhenomPv3Template,
+    "IMRPhenomXP_THA": IMRPhenomXPTHATemplate,
     "SEOBNRv2": SEOBNRv2Template,
     "SEOBNRv2_ROM_DoubleSpin": SEOBNRv2ROMDoubleSpinTemplate,
     "SEOBNRv2_ROM_DoubleSpin_HI": SEOBNRv2ROMDoubleSpinHITemplate,
