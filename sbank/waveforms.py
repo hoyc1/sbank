@@ -1135,7 +1135,25 @@ class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
             *args, lalsim.IMRPhenomPv2_V
         )
 
-    def _gen_harmonic_comp(thetaJN, alpha0, phi0):
+    def gen_harmonics_comp(self, thetaJN, alpha0, phi0, psi, df, f_final):
+        # generate hp, hc for given orientation
+        hp, hc = self._gen_harmonics_comp(thetaJN, alpha0, phi0, df, f_final)
+        # 1908.05707 defines psi in J-aligned frame. Need to rotate to L-aligned
+        # frame and multiply by w+, wx
+        dpsi = _dpsi(thetaJN, alpha0, self.beta)
+        fp = np.cos(2 * (psi - dpsi))
+        fc = -1. * np.sin(2 * (psi - dpsi))
+        h = (fp * hp.data.data[:] + fc * hc.data.data[:])
+        # 1908.05707 defines phi in J-aligned frame. Need to rotate to L-aligned
+        # frame
+        h *= np.exp(2j * _dphi(thetaJN, alpha0, self.beta))
+        # create LAL frequency array and return precessing harmonic
+        new = CreateCOMPLEX8FrequencySeries("", LIGOTimeGPS(hp.epoch), 0, df,
+                                            SecondUnit, len(h))
+        new.data.data[:] = h[:]
+        return new
+
+    def _gen_harmonics_comp(self, thetaJN, alpha0, phi0, df, f_final):
         return lalsim.SimIMRPhenomP(
             self.chi1_l,
             self.chi2_l,
@@ -1156,31 +1174,31 @@ class IMRPhenomPv2THATemplate(IMRPrecessingSpinTemplate):
         )
 
     def _compute_waveform_five_comps(self, df, f_final):
-        hgen1a, _  = self._gen_harmonics_comp(0., 0., 0.)
+        hgen1a = self.gen_harmonics_comp(0., 0., 0., 0., df, f_final)
         # hgen1b is negative w.r.t. 1908.05707
-        _, hgen1b = self._gen_harmonics_comp(0., 0., np.pi/4.)
+        hgen1b = self.gen_harmonics_comp(0., 0., np.pi/4., np.pi/4, df, f_final)
         # These are both negative w.r.t 1908.05707
-        _, hgen2a = self._gen_harmonics_comp(np.pi/2., 0., np.pi/4.)
-        _, hgen2b = self._gen_harmonics_comp(np.pi/2., np.pi/2., 0.)
-        hgen3a, _ = self._gen_harmonics_comp(np.pi/2., 0., 0.)
-        hgen3b, _ = self._gen_harmonics_comp(np.pi/2., np.pi/2., 0.)
+        hgen2a = self.gen_harmonics_comp(np.pi/2., 0., np.pi/4., np.pi/4, df, f_final)
+        hgen2b = self.gen_harmonics_comp(np.pi/2., np.pi/2., 0., np.pi/4, df, f_final)
+        hgen3a = self.gen_harmonics_comp(np.pi/2., 0., 0., 0., df, f_final)
+        hgen3b = self.gen_harmonics_comp(np.pi/2., np.pi/2., 0., 0., df, f_final)
 
         # Edit these arrays in place to avoid defining new LAL arrays
-        tmp = hgen1a.data.data[:] + hgen1b.data.data[:]
-        hgen1b.data.data[:] = (hgen1a.data.data[:] - hgen1b.data.data[:])/2.
+        tmp = hgen1a.data.data[:] - hgen1b.data.data[:]
+        hgen1b.data.data[:] = (hgen1a.data.data[:] + hgen1b.data.data[:])/2.
         hgen1a.data.data[:] = tmp / 2.
         h1 = hgen1a
         h5 = hgen1b
-        
+
         tmp = hgen2a.data.data[:] + hgen2b.data.data[:]
-        hgen2b.data.data[:] = 0.25 * (hgen2a.data.data[:] - hgen2b.data.data[:])
-        hgen2a.data.data[:] = 0.25 * tmp
+        hgen2b.data.data[:] = -0.25 * (hgen2a.data.data[:] - hgen2b.data.data[:])
+        hgen2a.data.data[:] = -0.25 * tmp
         h2 = hgen2a
         h4 = hgen2b
         hgen3a.data.data[:] = \
             1./6. * (hgen3a.data.data[:] + hgen3b.data.data[:])
         h3 = hgen3a
-        
+
         hs = (h1, h2, h3, h4, h5)
 
         return hs
@@ -1467,7 +1485,7 @@ class IMRPhenomXPTHATemplate(IMRPhenomPv2THATemplate):
             *args
         )
 
-    def _gen_harmonic_comp(thetaJN, alpha0, phi0):
+    def _gen_harmonics_comp(self, thetaJN, alpha0, phi0, df, f_final):
         # PhenomXP's generator uses cartesian coordinates not polar. Need to
         # convert back
         a1 = np.sqrt(
