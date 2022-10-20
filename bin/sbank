@@ -38,7 +38,7 @@ from ligo.lw import utils
 from ligo.lw.utils import process as ligolw_process
 
 #from sbank import git_version FIXME
-from sbank.bank import Bank
+from sbank.bank import BankTHA
 from sbank.tau0tau3 import proposals
 from sbank.psds import (noise_models, read_psd)
 from sbank.waveforms import waveforms, SnglInspiralTable
@@ -376,7 +376,7 @@ else:
 #
 # initialize the bank
 #
-bank = Bank(noise_model, opts.flow, opts.use_metric, opts.cache_waveforms, opts.neighborhood_size, opts.neighborhood_param, coarse_match_df=opts.coarse_match_df, iterative_match_df_max=opts.iterative_match_df_max, fhigh_max=opts.fhigh_max, optimize_flow=opts.optimize_flow, flow_column=opts.flow_column)
+bank = BankTHA(noise_model, opts.flow, cache_waveforms=opts.cache_waveforms, nhood_size=opts.neighborhood_size, nhood_param=opts.neighborhood_param, coarse_match_df=opts.coarse_match_df, iterative_match_df_max=opts.iterative_match_df_max, fhigh_max=opts.fhigh_max, optimize_flow=opts.optimize_flow, flow_column=opts.flow_column)
 for file_approx in opts.bank_seed:
 
     # if no approximant specified, use same approximant as the
@@ -488,6 +488,7 @@ if opts.trial_waveforms:
                     tmp[name] = hdf_fp[name][idx:end_idx]
             c_idx = idx % 100000
             approx = (hdf_fp['approximant'][c_idx]).decode('utf-8')
+            approx = "IMRPhenomXP_THA"
             tmplt_class = waveforms[approx]
             proposal.append(tmplt_class.from_dict(tmp, c_idx, bank))
         hdf_fp.close()
