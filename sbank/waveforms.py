@@ -1037,7 +1037,8 @@ class IMRPhenomPv3Template(IMRPrecessingSpinTemplate):
 def _dpsi(theta_jn, phi_jl, beta):
     """Calculate the difference between the polarization with respect to the
     total angular momentum and the polarization with respect to the orbital
-    angular momentum
+    angular momentum using code from
+    https://git.ligo.org/lscsoft/pesummary/-/blob/master/pesummary/gw/conversions/angles.py#L13
     """
     if theta_jn == 0:
         return -1. * phi_jl
@@ -1058,7 +1059,8 @@ def _dpsi(theta_jn, phi_jl, beta):
 
 def _dphi(theta_jn, phi_jl, beta):
     """Calculate the difference in the phase angle between J-aligned
-    and L-aligned frames
+    and L-aligned frames using code from
+    https://git.ligo.org/lscsoft/pesummary/-/blob/master/pesummary/gw/conversions/angles.py#L36
 
     Parameters
     ----------
