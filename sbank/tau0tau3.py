@@ -740,6 +740,7 @@ proposals = {
     "IMRPhenomPv2": double_spin_precessing_param_generator,
     "IMRPhenomPv2_THA": double_spin_precessing_param_generator,
     "IMRPhenomPv3": double_spin_precessing_param_generator,
+    "IMRPhenomXP_THA": double_spin_precessing_param_generator,
     "TaylorF2RedSpin": aligned_spin_param_generator,
     "EOBNRv2": nonspin_param_generator,
     "SEOBNRv1": aligned_spin_param_generator,
